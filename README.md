@@ -2,6 +2,18 @@
 
 本目录是 MiraBoard 的本地前端原型，当前阶段用于确认界面、导航、关键交互，以及 Mira 文件索引和确认式写入边界。
 
+## 代码结构
+
+- `app.js`：页面状态、导航与各业务视图编排。
+- `frontend_security.js`：HTML 转义与外部链接协议校验。
+- `data_utils.js`：CSV 和数字字段解析。
+- `markdown_renderer.js`：安全 Markdown 摘要与预览渲染。
+- `option_math.js`：无依赖期权情景计算。
+- `server.py`：本地 HTTP/API 编排、行情与研究工作流。
+- `server_security.py`：路径、AI 地址和本机请求来源校验。
+
+这些前端模块均使用普通 `<script>` 加载，不需要打包器，直接打开 `index.html` 的离线模式仍然有效。
+
 ## 打开方式
 
 推荐运行 `start.bat`。启动器会复用已健康运行的实例；否则在 5178-5185 中选择空闲端口，独立后台启动服务，通过健康检查后再打开浏览器。运行状态写入 `.tmp/miraboard-runtime.json`，启动错误写入 `.tmp/server-err.log`。
@@ -43,7 +55,7 @@
   - `/api/research-index`
   - `/api/source-file`
 - `/api/quote`
-- `/api/quotes`
+- `/api/quotes`：单次最多 40 个标的，同时最多运行 2 个批量任务；跨站浏览器请求会被拒绝。
 - `/api/update-market`、`/api/update-news`：首次调用只生成完整预览和一次性确认令牌；只有用户在界面确认后，第二次调用才写入对应 Mira 更新文件。
 - API 模式下，研究总览和标的库会使用真实 Mira `private/research` 对象索引。
 - 详情页资料库支持 Markdown / CSV / 文本文件的只读正文预览。
@@ -59,6 +71,7 @@
 - 如果仍不可用，会使用 `app.js` 里的嵌入式兜底数据，保证页面不白屏。
 - API 默认扫描相邻目录 `../Mira/private/research`。
 - 如 Mira 路径不同，可设置环境变量 `MIRABOARD_MIRA_ROOT`。
+- 前端请求统一带超时；本地读取、行情批量、AI/新闻和 Tushare 长任务使用不同时间预算。
 
 ## 边界
 

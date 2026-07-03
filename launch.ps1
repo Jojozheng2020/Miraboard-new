@@ -9,16 +9,24 @@ $StatePath = Join-Path $RuntimeDir "miraboard-runtime.json"
 $StdoutPath = Join-Path $RuntimeDir "server-out.log"
 $StderrPath = Join-Path $RuntimeDir "server-err.log"
 $Ports = 5178..5185
+$ExpectedServerHash = (Get-FileHash -LiteralPath (Join-Path $ProjectRoot "server.py") -Algorithm SHA256).Hash.ToLowerInvariant()
 
 New-Item -ItemType Directory -Path $RuntimeDir -Force | Out-Null
 
-function Test-MiraBoardHealth([int]$Port) {
+function Get-MiraBoardHealth([int]$Port) {
   try {
-    $response = Invoke-WebRequest -UseBasicParsing -TimeoutSec 2 "http://127.0.0.1:$Port/api/health"
-    return $response.StatusCode -eq 200
+    return Invoke-RestMethod -TimeoutSec 2 "http://127.0.0.1:$Port/api/health"
   } catch {
-    return $false
+    return $null
   }
+}
+
+function Test-MiraBoardHealth([int]$Port) {
+  $health = Get-MiraBoardHealth $Port
+  return $null -ne $health `
+    -and $health.status -eq "ok" `
+    -and $health.appRoot -eq $ProjectRoot `
+    -and $health.serverSourceHash -eq $ExpectedServerHash
 }
 
 function Open-MiraBoard([int]$Port) {
@@ -28,7 +36,20 @@ function Open-MiraBoard([int]$Port) {
 }
 
 foreach ($port in $Ports) {
-  if (Test-MiraBoardHealth $port) {
+  $health = Get-MiraBoardHealth $port
+  if ($null -ne $health -and $health.status -eq "ok" -and $health.appRoot -eq $ProjectRoot -and $health.serverSourceHash -ne $ExpectedServerHash) {
+    $staleListener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($staleListener) {
+      Write-Host "Stopping outdated MiraBoard instance on port $port..."
+      Stop-Process -Id $staleListener.OwningProcess -Force -ErrorAction SilentlyContinue
+      for ($attempt = 1; $attempt -le 20; $attempt += 1) {
+        if (-not (Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue)) { break }
+        Start-Sleep -Milliseconds 100
+      }
+    }
+    continue
+  }
+  if ($null -ne $health -and $health.status -eq "ok" -and $health.appRoot -eq $ProjectRoot -and $health.serverSourceHash -eq $ExpectedServerHash) {
     $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
     @{ port = $port; pid = $listener.OwningProcess; status = "healthy"; checkedAt = (Get-Date).ToString("s") } |
       ConvertTo-Json | Set-Content -Path $StatePath -Encoding UTF8

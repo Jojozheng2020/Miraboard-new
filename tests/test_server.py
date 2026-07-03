@@ -114,6 +114,10 @@ class MarketAnalysisTests(unittest.TestCase):
         pairs = server.parse_quote_pairs("600000.SH,,00700.HK", "A股,,港股")
         self.assertEqual(pairs, [("600000.SH", "A股"), ("00700.HK", "港股")])
 
+    def test_quote_pairs_are_capped_at_forty(self):
+        symbols = ",".join(f"{index:06d}.SH" for index in range(80))
+        self.assertEqual(len(server.parse_quote_pairs(symbols, "")), 40)
+
     def test_bare_ticker_folder_uses_memo_heading_as_company_name(self):
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory) / "603259.SH"
@@ -756,6 +760,9 @@ class ApiIntegrationTests(unittest.TestCase):
             self.assertEqual(response.status, 200)
             self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
             self.assertEqual(response.headers["X-Frame-Options"], "DENY")
+            payload = json.load(response)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(len(payload["serverSourceHash"]), 64)
 
     def test_static_server_does_not_expose_backend_source(self):
         with self.assertRaises(urllib.error.HTTPError) as raised:
@@ -773,8 +780,20 @@ class ApiIntegrationTests(unittest.TestCase):
             self.assertEqual(response.status, 200)
 
     def test_position_reviews_returns_200(self):
-        with self.request("/api/position-reviews") as response:
-            self.assertEqual(response.status, 200)
+        missing = {"status": "missing", "message": "尚未生成持仓复盘", "reviews": []}
+        with patch.object(server, "read_position_reviews", return_value=missing):
+            with self.request("/api/position-reviews") as response:
+                self.assertEqual(response.status, 200)
+                payload = json.load(response)
+        self.assertEqual(payload["status"], "missing")
+
+    def test_research_index_missing_is_business_status_200(self):
+        missing = {"status": "missing", "objects": []}
+        with patch.object(server, "scan_research_index", return_value=missing):
+            with self.request("/api/research-index") as response:
+                self.assertEqual(response.status, 200)
+                payload = json.load(response)
+        self.assertEqual(payload["status"], "missing")
 
     def test_market_session_returns_200(self):
         with self.request("/api/market-session") as response:
@@ -793,6 +812,14 @@ class ApiIntegrationTests(unittest.TestCase):
                 "/api/ai-config",
                 data=b"{}",
                 headers={"Content-Type": "application/json", "Origin": "https://evil.example"},
+            )
+        self.assertEqual(raised.exception.code, 403)
+
+    def test_cross_origin_get_returns_403(self):
+        with self.assertRaises(urllib.error.HTTPError) as raised:
+            self.request(
+                "/api/health",
+                headers={"Origin": "https://evil.example", "Sec-Fetch-Site": "cross-site"},
             )
         self.assertEqual(raised.exception.code, 403)
 

@@ -1,3 +1,7 @@
+const { escapeHtml } = globalThis.MiraBoardSecurity;
+const { parseCsv, csvNumberOrNull } = globalThis.MiraBoardDataUtils;
+const { buildMemoSummaryMarkdown, renderMarkdownPreview } = globalThis.MiraBoardMarkdown;
+
 const navItems = [
   ["overview", "研", "研究总览"],
   ["portfolio", "益", "投资收益"],
@@ -153,7 +157,7 @@ async function loadBootstrap() {
 
   for (const source of sources) {
     try {
-      const response = await fetch(source, { cache: "no-store" });
+      const response = await fetchWithTimeout(source, { cache: "no-store" }, 5000);
       if (!response.ok) continue;
       const data = await response.json();
       replaceArray(navItems, data.navItems);
@@ -341,9 +345,9 @@ async function syncResearchObjects() {
 async function loadPortfolioPerformance() {
   try {
     const responses = await Promise.all([
-      fetch("./data/portfolio-daily.csv", { cache: "no-store" }),
-      fetch("./data/portfolio-transactions.csv", { cache: "no-store" }),
-      fetch("./data/portfolio-daily-positions.csv", { cache: "no-store" }),
+      fetchWithTimeout("./data/portfolio-daily.csv", { cache: "no-store" }, 5000),
+      fetchWithTimeout("./data/portfolio-transactions.csv", { cache: "no-store" }, 5000),
+      fetchWithTimeout("./data/portfolio-daily-positions.csv", { cache: "no-store" }, 5000),
     ]);
     if (!responses.every(response => response.ok)) throw new Error("portfolio CSV missing");
     const dailyRows = parseCsv(await responses[0].text());
@@ -387,30 +391,6 @@ async function loadPortfolioPerformance() {
     const statusNode = document.getElementById("portfolioUpdatedAt");
     if (statusNode) statusNode.textContent = "内置账户快照 · 非实时 · 本地 CSV 未加载";
   }
-}
-
-function parseCsv(text) {
-  text = String(text || "").replace(/^\uFEFF/, "");
-  const rows = []; let row = [], field = "", quoted = false;
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    if (quoted && char === '"' && text[i + 1] === '"') { field += '"'; i += 1; }
-    else if (char === '"') quoted = !quoted;
-    else if (char === "," && !quoted) { row.push(field); field = ""; }
-    else if ((char === "\n" || char === "\r") && !quoted) {
-      if (char === "\r" && text[i + 1] === "\n") i += 1;
-      row.push(field); if (row.some(value => value !== "")) rows.push(row); row = []; field = "";
-    } else field += char;
-  }
-  if (field || row.length) { row.push(field); rows.push(row); }
-  const headers = rows.shift() || [];
-  return rows.map(values => Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""])));
-}
-
-function csvNumberOrNull(value) {
-  if (value === "" || value == null) return null;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : null;
 }
 
 function applyOverviewQuoteArchiveRows(rows) {
@@ -464,7 +444,7 @@ function applyOverviewPriceHistoryRows(rows) {
 
 async function loadOverviewPriceHistory() {
   try {
-    const response = await fetch("./data/overview-price-history.csv", { cache: "no-store" });
+    const response = await fetchWithTimeout("./data/overview-price-history.csv", { cache: "no-store" }, 5000);
     if (!response.ok) throw new Error("overview history CSV missing");
     overviewPriceHistoryRows = parseCsv(await response.text()).filter(row => row.symbol && row.date);
     applyOverviewPriceHistoryRows(overviewPriceHistoryRows);
@@ -478,7 +458,7 @@ async function loadOverviewPriceHistory() {
 async function loadOverviewQuoteArchive() {
   const statusNode = document.getElementById("overviewQuoteStatus");
   try {
-    const response = await fetch("./data/overview-quotes.csv", { cache: "no-store" });
+    const response = await fetchWithTimeout("./data/overview-quotes.csv", { cache: "no-store" }, 5000);
     if (!response.ok) throw new Error("overview quote CSV missing");
     const rows = parseCsv(await response.text()).filter(row => row.archive_date && row.symbol);
     const latestDate = rows.map(row => row.archive_date).sort().at(-1) || "";
@@ -1466,7 +1446,7 @@ function renderPortfolioContribution(filter = "all") {
     const profit = portfolioProfit(position);
     const width = Math.max(4, Math.abs(profit) / max * 100);
     return `<div class="contribution-row">
-      <div><span>${position.name}</span><strong class="${profit >= 0 ? "positive" : "negative"}">${formatPortfolioSigned(profit)}</strong></div>
+      <div><span>${escapeHtml(position.name)}</span><strong class="${profit >= 0 ? "positive" : "negative"}">${formatPortfolioSigned(profit)}</strong></div>
       <div class="contribution-track"><i class="${profit >= 0 ? "gain" : "loss"}" style="width:${width.toFixed(1)}%"></i></div>
     </div>`;
   }).join("");
@@ -1489,8 +1469,8 @@ function renderPortfolioHoldings(filter = "all") {
       : `<strong>${formatPortfolioMoney(position.price, priceDecimals)}</strong>`;
     return `
       <tr>
-        <td><strong>${position.name}</strong><span>${position.displayCode || position.code}</span></td>
-        <td><span class="pill ${position.account === "stock" ? "blue" : "muted"}">${position.account === "stock" ? "股票" : position.optionType}</span></td>
+        <td><strong>${escapeHtml(position.name)}</strong><span>${escapeHtml(position.displayCode || position.code)}</span></td>
+        <td><span class="pill ${position.account === "stock" ? "blue" : "muted"}">${position.account === "stock" ? "股票" : escapeHtml(position.optionType)}</span></td>
         <td class="number-cell">${formatPortfolioMoney(position.quantity, 0)}${position.account === "option" ? " 张" : " 股"}</td>
         <td class="number-cell">${formatPortfolioMoney(position.cost, priceDecimals)}</td>
         <td class="number-cell">${priceDisplay}</td>
@@ -2083,7 +2063,7 @@ async function showBatchPriceRefresh({ force = false } = {}) {
   if (radar) radar.innerHTML = batchRow + radar.innerHTML;
   const symbols = fetchTargets.map(({ object }) => encodeURIComponent(object.ticker)).join(",");
   const markets = fetchTargets.map(({ object }) => encodeURIComponent(object.market)).join(",");
-  const payload = await fetchJson(`/api/quotes?symbols=${symbols}&markets=${markets}`);
+  const payload = await fetchJson(`/api/quotes?symbols=${symbols}&markets=${markets}`, { timeoutMs: 60000 });
   (payload.quotes || []).forEach((quote, i) => {
     const source = fetchTargets[i];
     if (source) {
@@ -2131,6 +2111,7 @@ async function showBatchPriceRefresh({ force = false } = {}) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbols: historySymbols, end: archiveDate }),
+        timeoutMs: 260000,
       });
       await loadOverviewPriceHistory();
     } catch (error) {
@@ -2150,7 +2131,7 @@ async function showBatchPriceRefresh({ force = false } = {}) {
 async function fetchQuoteForObject(index = selectedObjectIndex) {
   const object = objects[index];
   if (!object) return null;
-  const quote = await fetchJson(`/api/quote?symbol=${encodeURIComponent(object.ticker)}&market=${encodeURIComponent(object.market || "")}`);
+  const quote = await fetchJson(`/api/quote?symbol=${encodeURIComponent(object.ticker)}&market=${encodeURIComponent(object.market || "")}`, { timeoutMs: 60000 });
   applyQuoteToLinkedState(object.ticker, quote, "stock");
   renderCards(getActiveOverviewFilter());
   renderTargets(getActiveTargetFilter());
@@ -2170,6 +2151,7 @@ async function updateMarketForObject(index = selectedObjectIndex, confirmationTo
       market: object.market || "",
       confirmationToken,
     }),
+    timeoutMs: 60000,
   });
   if (["ok", "read_only", "existing"].includes(payload.status) && payload.object) {
     const nextQuote = payload.quote || payload.object.quote || object.quote;
@@ -2214,6 +2196,7 @@ async function updateNewsForObject(index = selectedObjectIndex, confirmationToke
       market: object.market || "",
       confirmationToken,
     }),
+    timeoutMs: 130000,
   });
   if (["ok", "existing"].includes(payload.status) && payload.object) {
     if (payload.document?.path) sourcePreviewCache.set(payload.document.path, payload.document);
@@ -2242,8 +2225,24 @@ async function updateNewsForObject(index = selectedObjectIndex, confirmationToke
   return payload;
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 15000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`请求超时（${timeoutMs}ms）`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function fetchJson(url, options = {}) {
-  const response = await fetch(url, { cache: "no-store", ...options });
+  const { timeoutMs = 15000, ...requestOptions } = options;
+  const response = await fetchWithTimeout(url, { cache: "no-store", ...requestOptions }, timeoutMs);
   let payload;
   try {
     payload = await response.json();
@@ -2257,18 +2256,7 @@ async function fetchJson(url, options = {}) {
 }
 
 async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 15000) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetchJson(url, { ...options, signal: controller.signal });
-  } catch (error) {
-    if (error?.name === "AbortError") {
-      throw new Error(`请求超时（${timeoutMs}ms）`);
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeout);
-  }
+  return fetchJson(url, { ...options, timeoutMs });
 }
 
 function requestQuoteForObject(index = selectedObjectIndex) {
@@ -2972,7 +2960,11 @@ async function loadSourcePreview(file, container) {
   let payload = sourcePreviewCache.get(cacheKey);
   try {
     if (!payload) {
-      const response = await fetch(`/api/source-file?path=${encodeURIComponent(file.path)}`, { cache: "no-store" });
+      const response = await fetchWithTimeout(
+        `/api/source-file?path=${encodeURIComponent(file.path)}`,
+        { cache: "no-store" },
+        15000
+      );
       payload = await response.json();
       sourcePreviewCache.set(cacheKey, payload);
     }
@@ -3034,161 +3026,6 @@ function renderTextPreview(payload, mode = "full") {
   return `
     ${sourceHead}
     <div class="markdown-preview">${body}</div>`;
-}
-
-function buildMemoSummaryMarkdown(markdown, mode) {
-  const sections = splitMarkdownLevelTwoSections(markdown);
-  const conclusionSections = sections.filter(section => {
-    const heading = normalizeMemoSectionHeading(section.heading);
-    return heading === "核心结论" || heading === "判断" || heading === "判断层" ||
-      heading === "研究判断" || /Mira\s*当前(?:研究)?姿态/i.test(heading) ||
-      /^Executive Summary/i.test(heading);
-  });
-  let debateSections = sections.filter(section => {
-    const heading = normalizeMemoSectionHeading(section.heading);
-    return /核心投资辩题|投资争议|关键争议|关键变量|核心变量|决策铰链|必须成立的条件|预期差/.test(heading);
-  });
-  if (!debateSections.length) {
-    debateSections = sections.filter(section => {
-      const heading = normalizeMemoSectionHeading(section.heading);
-      return /关键监控变量|关键监控指标|监控框架|核心\s*thesis/i.test(heading);
-    });
-  }
-  const thesisHeadings = debateSections.length ? [] : sections
-    .map(section => normalizeMemoSectionHeading(section.heading))
-    .filter(heading => /^Thesis\s*\d+\s*[:：]/i.test(heading));
-
-  if (mode === "memo-debate") {
-    const output = ["## 核心投资辩题 / 关键变量", ""];
-    if (!debateSections.length && !thesisHeadings.length) {
-      output.push("当前报告尚未设置可识别的核心投资辩题或关键变量章节。", "");
-      return output.join("\n").trim();
-    }
-    debateSections.forEach(section => {
-      output.push(`### ${normalizeMemoSectionHeading(section.heading)}`, "", ...section.body, "");
-    });
-    if (thesisHeadings.length) {
-      output.push(...thesisHeadings.map(heading => `- ${heading}`), "");
-    }
-    return output.join("\n").trim();
-  }
-
-  const output = ["## 核心结论和判断", ""];
-  if (!conclusionSections.length) {
-    output.push("当前报告尚未设置可识别的核心结论或判断章节。", "");
-    return output.join("\n").trim();
-  }
-  conclusionSections.forEach((section, index) => {
-    if (conclusionSections.length > 1) output.push(`### ${normalizeMemoSectionHeading(section.heading)}`, "");
-    output.push(...section.body, "");
-  });
-  return output.join("\n").trim();
-}
-
-function splitMarkdownLevelTwoSections(markdown) {
-  const lines = String(markdown || "").split(/\r?\n/);
-  const sections = [];
-  let current = null;
-  lines.forEach(line => {
-    const match = line.match(/^##\s+(.+)$/);
-    if (match) {
-      if (current) sections.push(current);
-      current = { heading: match[1].trim(), body: [] };
-      return;
-    }
-    if (current) current.body.push(line);
-  });
-  if (current) sections.push(current);
-  return sections;
-}
-
-function normalizeMemoSectionHeading(value) {
-  return String(value || "").replace(/^\s*\d+(?:\.\d+)*[.、]?\s*/, "").trim();
-}
-
-function renderMarkdownPreview(markdown, maxLines = 360) {
-  const allLines = markdown.split(/\r?\n/);
-  const lines = Number.isFinite(maxLines) ? allLines.slice(0, maxLines) : allLines;
-  const html = [];
-  let index = 0;
-  let inList = false;
-  let inCode = false;
-  let codeLines = [];
-
-  const closeList = () => {
-    if (inList) {
-      html.push("</ul>");
-      inList = false;
-    }
-  };
-
-  while (index < lines.length) {
-    const line = lines[index];
-    const trimmed = line.trimEnd();
-
-    if (trimmed.startsWith("```")) {
-      if (inCode) {
-        html.push(`<pre class="md-code-block"><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
-        codeLines = [];
-        inCode = false;
-      } else {
-        closeList();
-        inCode = true;
-      }
-      index += 1;
-      continue;
-    }
-
-    if (inCode) {
-      codeLines.push(line);
-      index += 1;
-      continue;
-    }
-
-    if (!trimmed.trim()) {
-      closeList();
-      index += 1;
-      continue;
-    }
-
-    if (isMarkdownTableStart(lines, index)) {
-      closeList();
-      const parsed = parseMarkdownTable(lines, index);
-      html.push(renderMarkdownTable(parsed.rows));
-      index = parsed.nextIndex;
-      continue;
-    }
-
-    const heading = trimmed.match(/^(#{1,4})\s+(.+)$/);
-    if (heading) {
-      closeList();
-      const level = Math.min(4, heading[1].length + 1);
-      html.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
-      index += 1;
-      continue;
-    }
-
-    const bullet = trimmed.match(/^[-*]\s+(.+)$/);
-    if (bullet) {
-      if (!inList) {
-        html.push("<ul class=\"md-list\">");
-        inList = true;
-      }
-      html.push(`<li>${renderInlineMarkdown(bullet[1])}</li>`);
-      index += 1;
-      continue;
-    }
-
-    closeList();
-    html.push(`<p>${renderInlineMarkdown(trimmed)}</p>`);
-    index += 1;
-  }
-
-  closeList();
-  if (inCode) {
-    html.push(`<pre class="md-code-block"><code>${escapeHtml(codeLines.join("\n"))}</code></pre>`);
-  }
-  return html.join("");
 }
 
 function ensureFullscreenPreview() {
@@ -3281,80 +3118,6 @@ async function requestPreviewWriteConfirmation(payload) {
     if (pendingPreviewConfirmation) pendingPreviewConfirmation(false);
     pendingPreviewConfirmation = resolve;
   });
-}
-
-function isMarkdownTableStart(lines, index) {
-  const current = lines[index]?.trim();
-  const next = lines[index + 1]?.trim();
-  return Boolean(
-    current?.startsWith("|") &&
-    current.endsWith("|") &&
-    /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(next || "")
-  );
-}
-
-function parseMarkdownTable(lines, startIndex) {
-  const rows = [];
-  let index = startIndex;
-  while (index < lines.length) {
-    const line = lines[index].trim();
-    if (!line.startsWith("|") || !line.endsWith("|")) break;
-    if (index !== startIndex + 1) rows.push(splitMarkdownTableRow(line));
-    index += 1;
-  }
-  return { rows, nextIndex: index };
-}
-
-function splitMarkdownTableRow(line) {
-  return line
-    .replace(/^\|/, "")
-    .replace(/\|$/, "")
-    .split("|")
-    .map(cell => cell.trim());
-}
-
-function renderMarkdownTable(rows) {
-  if (!rows.length) return "";
-  const [head, ...body] = rows;
-  return `
-    <div class="md-table-wrap">
-      <table class="md-table">
-        <thead><tr>${head.map(cell => `<th>${renderInlineMarkdown(cell)}</th>`).join("")}</tr></thead>
-        <tbody>${body.map(row => `<tr>${row.map(cell => `<td>${renderInlineMarkdown(cell)}</td>`).join("")}</tr>`).join("")}</tbody>
-      </table>
-    </div>`;
-}
-
-function renderInlineMarkdown(value) {
-  return escapeHtml(value)
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, label, rawUrl) => {
-      const href = safeExternalUrl(rawUrl);
-      return href
-        ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`
-        : `${label} <span class="unsafe-link-note">[链接已拦截]</span>`;
-    });
-}
-
-function safeExternalUrl(value) {
-  try {
-    const decoded = String(value || "").replace(/&amp;/g, "&");
-    const url = new URL(decoded, window.location.href);
-    if (!["http:", "https:"].includes(url.protocol)) return "";
-    return escapeHtml(url.href);
-  } catch {
-    return "";
-  }
-}
-
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
 }
 
 function getSelectedObjectFiles() {
@@ -4324,7 +4087,7 @@ function attachAiSettingsActions() {
     updateAiConnectionStatus({ status: "saved", message: "正在测试模型接口..." });
     try {
       await saveAiSettings();
-      const payload = await fetchJson("/api/ai-test", { method: "POST" });
+      const payload = await fetchJson("/api/ai-test", { method: "POST", timeoutMs: 30000 });
       applyAiConfigToSettings(payload.config || { status: "error", message: payload.message });
     } catch (error) {
       updateAiConnectionStatus({ status: "error", message: error.message });

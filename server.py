@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
-import ipaddress
 import mimetypes
 import os
 import re
 import secrets
-import socket
 import subprocess
 import sys
 import threading
@@ -21,8 +20,17 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
+from server_security import (
+    NoAiRedirectHandler,
+    ai_chat_completions_url,
+    is_trusted_local_request,
+    resolve_within,
+    validate_ai_base_url,
+)
+
 
 APP_ROOT = Path(__file__).resolve().parent
+SERVER_SOURCE_HASH = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 DEFAULT_MIRA_ROOT = APP_ROOT.parent / "Mira"
 MIRA_ROOT = Path(os.environ.get("MIRABOARD_MIRA_ROOT", DEFAULT_MIRA_ROOT)).resolve()
 RESEARCH_ROOT = MIRA_ROOT / "private" / "research"
@@ -32,6 +40,7 @@ PORTFOLIO_POSITIONS_PATH = APP_ROOT / "data" / "portfolio-daily-positions.csv"
 PORTFOLIO_ARCHIVE_LOCK = threading.Lock()
 OVERVIEW_QUOTES_PATH = APP_ROOT / "data" / "overview-quotes.csv"
 OVERVIEW_QUOTES_LOCK = threading.Lock()
+QUOTE_BATCH_SEMAPHORE = threading.BoundedSemaphore(2)
 OVERVIEW_HISTORY_PATH = APP_ROOT / "data" / "overview-price-history.csv"
 OVERVIEW_HISTORY_LOCK = threading.Lock()
 TUSHARE_HISTORY_ADAPTER_PATH = APP_ROOT / "tushare_history_adapter.py"
@@ -113,6 +122,9 @@ PUBLIC_STATIC_PATHS = {
     "/index.html",
     "/app.js",
     "/styles.css",
+    "/frontend_security.js",
+    "/data_utils.js",
+    "/markdown_renderer.js",
     "/option_math.js",
     "/data/bootstrap.json",
     "/data/portfolio-daily.csv",
@@ -121,17 +133,6 @@ PUBLIC_STATIC_PATHS = {
     "/data/overview-quotes.csv",
     "/data/overview-price-history.csv",
 }
-
-
-def resolve_within(path: Path, root: Path, *, strict: bool = False) -> Path | None:
-    """Resolve a path and reject traversal or symlink escapes from root."""
-    try:
-        resolved_root = root.resolve(strict=False)
-        resolved = path.resolve(strict=strict)
-        resolved.relative_to(resolved_root)
-        return resolved
-    except (OSError, RuntimeError, ValueError):
-        return None
 
 
 def is_safe_mira_path(path: Path, *, strict: bool = False) -> bool:
@@ -367,37 +368,6 @@ def save_ai_config(payload: dict) -> dict:
     return {"status": "ok", "message": "设置已保存", "config": public_ai_config()}
 
 
-def validate_ai_base_url(base_url: str) -> str:
-    if not base_url:
-        return "请填写 API 地址"
-    parsed = urlparse(base_url)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        return "API 地址必须是有效的 http(s) URL"
-    if parsed.scheme == "http" and parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-        return "远程接口必须使用 HTTPS；HTTP 仅允许本机模型"
-    if parsed.username or parsed.password:
-        return "API 地址不能包含用户名或密码"
-    if parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-        try:
-            addresses = {item[4][0] for item in socket.getaddrinfo(parsed.hostname, parsed.port or 443)}
-        except socket.gaierror:
-            return "API 地址无法解析"
-        for address in addresses:
-            if not ipaddress.ip_address(address).is_global:
-                return "远程 API 地址不能指向本机、内网或保留地址"
-    return ""
-
-
-def ai_chat_completions_url(base_url: str) -> str:
-    base = base_url.rstrip("/")
-    return base if base.endswith("/chat/completions") else f"{base}/chat/completions"
-
-
-class NoAiRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
-
-
 def test_ai_connection() -> dict:
     with AI_CONFIG_LOCK:
         config = dict(AI_CONFIG)
@@ -603,14 +573,14 @@ def write_ai_document(target: Path, markdown: str) -> None:
 
 
 def safe_stat(path: Path) -> dict:
-  try:
-    stat = path.stat()
-    return {
-      "size": stat.st_size,
-      "modifiedAt": stat.st_mtime,
-    }
-  except OSError:
-    return {"size": None, "modifiedAt": None}
+    try:
+        stat = path.stat()
+        return {
+            "size": stat.st_size,
+            "modifiedAt": stat.st_mtime,
+        }
+    except OSError:
+        return {"size": None, "modifiedAt": None}
 
 
 def safe_children(path: Path) -> list[Path]:
@@ -682,105 +652,105 @@ def infer_routed_us_ticker(folder: Path) -> str:
 
 
 def infer_object(folder: Path) -> dict:
-  name = folder.name
-  ticker = ""
-  display_name = name
-  if name.startswith("大宗商品_"):
-    ticker, display_name = name.split("_", 1)
-  else:
-    stock_match = STOCK_FOLDER_PATTERN.fullmatch(name)
-    us_stock_match = US_STOCK_FOLDER_PATTERN.fullmatch(name)
-    if stock_match:
-      ticker = stock_match.group("ticker").upper()
-      display_name = stock_match.group("name") or infer_name_from_research_files(folder, ticker)
-    elif us_stock_match:
-      ticker = re.sub(r"\.(?:NASDAQ|NYSE)$", ".US", us_stock_match.group("ticker").upper())
-      display_name = us_stock_match.group("name") or infer_name_from_research_files(folder, ticker)
+    name = folder.name
+    ticker = ""
+    display_name = name
+    if name.startswith("大宗商品_"):
+        ticker, display_name = name.split("_", 1)
     else:
-      routed_ticker = infer_routed_us_ticker(folder)
-      if routed_ticker:
-        ticker = routed_ticker
-        display_name = infer_name_from_research_files(folder, ticker)
+        stock_match = STOCK_FOLDER_PATTERN.fullmatch(name)
+        us_stock_match = US_STOCK_FOLDER_PATTERN.fullmatch(name)
+        if stock_match:
+            ticker = stock_match.group("ticker").upper()
+            display_name = stock_match.group("name") or infer_name_from_research_files(folder, ticker)
+        elif us_stock_match:
+            ticker = re.sub(r"\.(?:NASDAQ|NYSE)$", ".US", us_stock_match.group("ticker").upper())
+            display_name = us_stock_match.group("name") or infer_name_from_research_files(folder, ticker)
+        else:
+            routed_ticker = infer_routed_us_ticker(folder)
+            if routed_ticker:
+                ticker = routed_ticker
+                display_name = infer_name_from_research_files(folder, ticker)
 
-  files = []
-  for child in sorted(safe_children(folder), key=lambda item: item.name.lower()):
-    if not child.is_file():
-      continue
-    if not is_safe_mira_path(child):
-      continue
-    if child.suffix.lower() not in {".md", ".pdf", ".csv", ".xlsx", ".html"}:
-      continue
-    rel_path = child.relative_to(MIRA_ROOT).as_posix()
-    files.append({
-      "title": child.name,
-      "type": child.suffix.lower().lstrip(".") or "file",
-      "path": rel_path,
-      **safe_stat(child),
-    })
+    files = []
+    for child in sorted(safe_children(folder), key=lambda item: item.name.lower()):
+        if not child.is_file():
+            continue
+        if not is_safe_mira_path(child):
+            continue
+        if child.suffix.lower() not in {".md", ".pdf", ".csv", ".xlsx", ".html"}:
+            continue
+        rel_path = child.relative_to(MIRA_ROOT).as_posix()
+        files.append({
+            "title": child.name,
+            "type": child.suffix.lower().lstrip(".") or "file",
+            "path": rel_path,
+            **safe_stat(child),
+        })
 
-  return {
-    "id": name,
-    "ticker": ticker,
-    "name": display_name,
-    "path": folder.relative_to(MIRA_ROOT).as_posix(),
-    "fileCount": len(files),
-    "latestModifiedAt": max((item["modifiedAt"] or 0 for item in files), default=None),
-    "files": files[:30],
-  }
+    return {
+        "id": name,
+        "ticker": ticker,
+        "name": display_name,
+        "path": folder.relative_to(MIRA_ROOT).as_posix(),
+        "fileCount": len(files),
+        "latestModifiedAt": max((item["modifiedAt"] or 0 for item in files), default=None),
+        "files": files[:30],
+    }
 
 
 def infer_market(ticker: str, object_id: str = "") -> str:
-  ticker = ticker.upper()
-  if ticker in ETF_TICKERS:
-    return "ETF"
-  if ticker.endswith((".SH", ".SZ", ".BJ")):
-    return "A股"
-  if ticker.endswith(".HK"):
-    return "港股"
-  if ticker.endswith((".US", ".NASDAQ", ".NYSE")):
-    return "美股"
-  if object_id.startswith("大宗商品_"):
-    return "大宗商品"
-  return "行业分析"
+    ticker = ticker.upper()
+    if ticker in ETF_TICKERS:
+        return "ETF"
+    if ticker.endswith((".SH", ".SZ", ".BJ")):
+        return "A股"
+    if ticker.endswith(".HK"):
+        return "港股"
+    if ticker.endswith((".US", ".NASDAQ", ".NYSE")):
+        return "美股"
+    if object_id.startswith("大宗商品_"):
+        return "大宗商品"
+    return "行业分析"
 
 
 def infer_refresh_state(latest_modified_at: float | None) -> str:
-  if not latest_modified_at:
-    return "needs_refresh"
-  age = time.time() - latest_modified_at
-  if age <= FRESH_SECONDS:
-    return "fresh"
-  if age <= STALE_SECONDS:
-    return "needs_refresh"
-  return "stale"
+    if not latest_modified_at:
+        return "needs_refresh"
+    age = time.time() - latest_modified_at
+    if age <= FRESH_SECONDS:
+        return "fresh"
+    if age <= STALE_SECONDS:
+        return "needs_refresh"
+    return "stale"
 
 
 def to_board_object(index_object: dict) -> dict:
-  latest_modified_at = index_object.get("latestModifiedAt")
-  stale = infer_refresh_state(latest_modified_at)
-  file_count = index_object.get("fileCount", 0)
-  trend = extract_latest_market_update_trend(index_object)
-  folder_path = index_object.get("path", "")
-  folder = (MIRA_ROOT / folder_path).resolve() if folder_path else None
-  evidence_quality = score_evidence_quality(folder) if folder else empty_evidence_quality()
-  return {
-    "ticker": index_object.get("ticker", ""),
-    "name": index_object.get("name") or index_object.get("id", ""),
-    "market": infer_market(index_object.get("ticker", ""), index_object.get("id", "")),
-    "price": "待接入",
-    "change": "",
-    "trend": trend.get("trend", ""),
-    "trendSource": trend.get("source", ""),
-    "trendSourceModifiedAt": trend.get("modifiedAt"),
-    "state": "indexed",
-    "stale": stale,
-    "color": "green" if stale == "fresh" else "amber" if stale == "needs_refresh" else "red",
-    "path": index_object.get("path", ""),
-    "fileCount": file_count,
-    "latestModifiedAt": latest_modified_at,
-    "files": index_object.get("files", []),
-    "evidenceQuality": evidence_quality,
-  }
+    latest_modified_at = index_object.get("latestModifiedAt")
+    stale = infer_refresh_state(latest_modified_at)
+    file_count = index_object.get("fileCount", 0)
+    trend = extract_latest_market_update_trend(index_object)
+    folder_path = index_object.get("path", "")
+    folder = (MIRA_ROOT / folder_path).resolve() if folder_path else None
+    evidence_quality = score_evidence_quality(folder) if folder else empty_evidence_quality()
+    return {
+        "ticker": index_object.get("ticker", ""),
+        "name": index_object.get("name") or index_object.get("id", ""),
+        "market": infer_market(index_object.get("ticker", ""), index_object.get("id", "")),
+        "price": "待接入",
+        "change": "",
+        "trend": trend.get("trend", ""),
+        "trendSource": trend.get("source", ""),
+        "trendSourceModifiedAt": trend.get("modifiedAt"),
+        "state": "indexed",
+        "stale": stale,
+        "color": "green" if stale == "fresh" else "amber" if stale == "needs_refresh" else "red",
+        "path": index_object.get("path", ""),
+        "fileCount": file_count,
+        "latestModifiedAt": latest_modified_at,
+        "files": index_object.get("files", []),
+        "evidenceQuality": evidence_quality,
+    }
 
 
 EVIDENCE_CATEGORIES = (
@@ -949,81 +919,81 @@ def average(values: list[float]) -> float:
 
 
 def extract_latest_market_update_trend(index_object: dict) -> dict:
-  folder_path = index_object.get("path", "")
-  folder = (MIRA_ROOT / folder_path).resolve() if folder_path else None
-  try:
-    if not folder or not folder.is_dir() or not folder.relative_to(MIRA_ROOT):
-      return {}
-  except ValueError:
-    return {}
+    folder_path = index_object.get("path", "")
+    folder = (MIRA_ROOT / folder_path).resolve() if folder_path else None
+    try:
+        if not folder or not folder.is_dir() or not folder.relative_to(MIRA_ROOT):
+            return {}
+    except ValueError:
+        return {}
 
-  candidates = sorted(
-      (path for path in folder.glob("*market-update*.md") if is_safe_mira_path(path)),
-      key=safe_mtime,
-      reverse=True,
-  )
-  if not candidates:
-    return {}
-  source = candidates[0]
-  text = source.read_text(encoding="utf-8", errors="replace")
-  trend = parse_market_update_trend(text)
-  return {
-      "trend": trend,
-      "source": source.relative_to(MIRA_ROOT).as_posix(),
-      "modifiedAt": safe_mtime(source),
-  } if trend else {
-      "source": source.relative_to(MIRA_ROOT).as_posix(),
-      "modifiedAt": safe_mtime(source),
-  }
+    candidates = sorted(
+            (path for path in folder.glob("*market-update*.md") if is_safe_mira_path(path)),
+            key=safe_mtime,
+            reverse=True,
+    )
+    if not candidates:
+        return {}
+    source = candidates[0]
+    text = source.read_text(encoding="utf-8", errors="replace")
+    trend = parse_market_update_trend(text)
+    return {
+            "trend": trend,
+            "source": source.relative_to(MIRA_ROOT).as_posix(),
+            "modifiedAt": safe_mtime(source),
+    } if trend else {
+            "source": source.relative_to(MIRA_ROOT).as_posix(),
+            "modifiedAt": safe_mtime(source),
+    }
 
 
 def parse_market_update_trend(text: str) -> str:
-  lines = [line.strip().strip("|") for line in text.splitlines()]
-  in_judgment = False
-  for line in lines:
-    clean = re.sub(r"\s+", " ", line).strip()
-    heading = clean.lstrip("#").strip()
-    if re.match(r"^(judgment|判断|走势判断|核心判断)\s*[:：]?$", heading, re.I):
-      in_judgment = True
-      continue
-    if in_judgment:
-      if not clean:
-        continue
-      if clean.startswith("#"):
-        break
-      if clean.startswith("- "):
-        return clean_trend_text(clean[2:])
-      return clean_trend_text(clean)
+    lines = [line.strip().strip("|") for line in text.splitlines()]
+    in_judgment = False
+    for line in lines:
+        clean = re.sub(r"\s+", " ", line).strip()
+        heading = clean.lstrip("#").strip()
+        if re.match(r"^(judgment|判断|走势判断|核心判断)\s*[:：]?$", heading, re.I):
+            in_judgment = True
+            continue
+        if in_judgment:
+            if not clean:
+                continue
+            if clean.startswith("#"):
+                break
+            if clean.startswith("- "):
+                return clean_trend_text(clean[2:])
+            return clean_trend_text(clean)
 
-  patterns = [
-      re.compile(r"趋势判断\s*[|:：]\s*(.+)"),
-      re.compile(r"趋势状态\s*[|:：]\s*(.+)"),
-      re.compile(r"短线状态\s*[|:：]\s*(.+)"),
-      re.compile(r"Mira technical state\s*[|:：]\s*(.+)", re.I),
-      re.compile(r"^[-*]?\s*judgment\s*[|:：]\s*[`“\"]?(.+?)[`”\"]?$", re.I),
-  ]
-  for line in lines:
-    clean = re.sub(r"\s+", " ", line).strip()
-    for pattern in patterns:
-      match = pattern.search(clean)
-      if match:
-        return clean_trend_text(match.group(1))
+    patterns = [
+            re.compile(r"趋势判断\s*[|:：]\s*(.+)"),
+            re.compile(r"趋势状态\s*[|:：]\s*(.+)"),
+            re.compile(r"短线状态\s*[|:：]\s*(.+)"),
+            re.compile(r"Mira technical state\s*[|:：]\s*(.+)", re.I),
+            re.compile(r"^[-*]?\s*judgment\s*[|:：]\s*[`“\"]?(.+?)[`”\"]?$", re.I),
+    ]
+    for line in lines:
+        clean = re.sub(r"\s+", " ", line).strip()
+        for pattern in patterns:
+            match = pattern.search(clean)
+            if match:
+                return clean_trend_text(match.group(1))
 
-  for line in lines:
-    clean = re.sub(r"\s+", " ", line).strip()
-    if any(key in clean for key in ("趋势状态", "趋势判断", "更新结论", "短线状态")):
-      sentence = re.split(r"[。；;]", clean, maxsplit=1)[0]
-      return clean_trend_text(sentence)
-  return ""
+    for line in lines:
+        clean = re.sub(r"\s+", " ", line).strip()
+        if any(key in clean for key in ("趋势状态", "趋势判断", "更新结论", "短线状态")):
+            sentence = re.split(r"[。；;]", clean, maxsplit=1)[0]
+            return clean_trend_text(sentence)
+    return ""
 
 
 def clean_trend_text(value: str) -> str:
-  value = re.sub(r"<[^>]+>", " ", value)
-  value = value.strip().strip("`*_# ：:|")
-  value = re.split(r"\s+\|\s+", value)[0].strip()
-  value = re.sub(r"^(judgment|判断|趋势判断|趋势状态|短线状态|更新结论)\s*[:：]?\s*", "", value, flags=re.I)
-  value = value.strip().strip("`*_# ：:|")
-  return value[:120]
+    value = re.sub(r"<[^>]+>", " ", value)
+    value = value.strip().strip("`*_# ：:|")
+    value = re.split(r"\s+\|\s+", value)[0].strip()
+    value = re.sub(r"^(judgment|判断|趋势判断|趋势状态|短线状态|更新结论)\s*[:：]?\s*", "", value, flags=re.I)
+    value = value.strip().strip("`*_# ：:|")
+    return value[:120]
 
 
 def is_quote_candidate(ticker: str, market: str = "") -> bool:
@@ -2601,7 +2571,7 @@ def quote_gap(ticker: str, market: str, provider: str, message: str, *, url: str
     }
 
 
-def parse_quote_pairs(symbols_value: str, markets_value: str, limit: int = 80) -> list[tuple[str, str]]:
+def parse_quote_pairs(symbols_value: str, markets_value: str, limit: int = 40) -> list[tuple[str, str]]:
     symbols = (symbols_value or "").split(",")
     markets = (markets_value or "").split(",") if markets_value else []
     return [
@@ -2630,27 +2600,27 @@ def http_get_text(
 
 
 def scan_research_index(limit: int = 200) -> dict:
-  if not RESEARCH_ROOT.exists():
+    if not RESEARCH_ROOT.exists():
+        return {
+            "status": "missing",
+            "miraRoot": str(MIRA_ROOT),
+            "researchRoot": str(RESEARCH_ROOT),
+            "objects": [],
+        }
+
+    objects = []
+    for folder in sorted(safe_children(RESEARCH_ROOT), key=lambda item: item.name.lower()):
+        if folder.is_dir() and is_safe_mira_path(folder):
+            objects.append(infer_object(folder))
+        if len(objects) >= limit:
+            break
+
     return {
-      "status": "missing",
-      "miraRoot": str(MIRA_ROOT),
-      "researchRoot": str(RESEARCH_ROOT),
-      "objects": [],
+        "status": "ok",
+        "miraRoot": str(MIRA_ROOT),
+        "researchRoot": str(RESEARCH_ROOT),
+        "objects": objects,
     }
-
-  objects = []
-  for folder in sorted(safe_children(RESEARCH_ROOT), key=lambda item: item.name.lower()):
-    if folder.is_dir() and is_safe_mira_path(folder):
-      objects.append(infer_object(folder))
-    if len(objects) >= limit:
-      break
-
-  return {
-    "status": "ok",
-    "miraRoot": str(MIRA_ROOT),
-    "researchRoot": str(RESEARCH_ROOT),
-    "objects": objects,
-  }
 
 
 def scan_industry_docs(limit: int = 200) -> dict:
@@ -2811,316 +2781,316 @@ def build_bootstrap() -> dict:
 
 
 def read_source_file(rel_path: str) -> dict:
-  if not rel_path:
-    return {"status": "error", "message": "missing path"}
+    if not rel_path:
+        return {"status": "error", "message": "missing path"}
 
-  if ".." in Path(rel_path).parts:
-    return {"status": "error", "message": "parent path segments are not allowed"}
-  target = resolve_within(MIRA_ROOT / rel_path, MIRA_ROOT)
-  if target is None:
-    return {"status": "error", "message": "path outside Mira root"}
+    if ".." in Path(rel_path).parts:
+        return {"status": "error", "message": "parent path segments are not allowed"}
+    target = resolve_within(MIRA_ROOT / rel_path, MIRA_ROOT)
+    if target is None:
+        return {"status": "error", "message": "path outside Mira root"}
 
-  if not target.exists() or not target.is_file():
-    return {"status": "missing", "message": "file not found"}
+    if not target.exists() or not target.is_file():
+        return {"status": "missing", "message": "file not found"}
 
-  if target.suffix.lower() not in TEXT_SUFFIXES:
+    if target.suffix.lower() not in TEXT_SUFFIXES:
+        return {
+            "status": "unsupported",
+            "path": rel_path,
+            "type": target.suffix.lower().lstrip("."),
+            "message": "preview supports text files only",
+        }
+
+    try:
+        raw = target.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return {"status": "error", "message": f"file could not be read: {str(exc)[:160]}"}
+    truncated = len(raw) > MAX_TEXT_PREVIEW_CHARS
+    text = raw[:MAX_TEXT_PREVIEW_CHARS]
     return {
-      "status": "unsupported",
-      "path": rel_path,
-      "type": target.suffix.lower().lstrip("."),
-      "message": "preview supports text files only",
+        "status": "ok",
+        "path": rel_path,
+        "title": target.name,
+        "type": target.suffix.lower().lstrip("."),
+        "text": text,
+        "summary": extract_markdown_summary(text) if target.suffix.lower() == ".md" else {},
+        "truncated": truncated,
+        **safe_stat(target),
     }
-
-  try:
-    raw = target.read_text(encoding="utf-8", errors="replace")
-  except OSError as exc:
-    return {"status": "error", "message": f"file could not be read: {str(exc)[:160]}"}
-  truncated = len(raw) > MAX_TEXT_PREVIEW_CHARS
-  text = raw[:MAX_TEXT_PREVIEW_CHARS]
-  return {
-    "status": "ok",
-    "path": rel_path,
-    "title": target.name,
-    "type": target.suffix.lower().lstrip("."),
-    "text": text,
-    "summary": extract_markdown_summary(text) if target.suffix.lower() == ".md" else {},
-    "truncated": truncated,
-    **safe_stat(target),
-  }
 
 
 def extract_markdown_summary(text: str) -> dict:
-  lines = text.splitlines()
-  return {
-    "dataCutoff": find_key_value(lines, ["data_cutoff", "data cutoff", "数据截止", "数据截至"]),
-    "mustRefreshIf": find_section(lines, ["must_refresh_if", "must refresh if", "刷新边界", "必须刷新"], skip_tables=True),
-    "coreConclusion": find_core_conclusion(lines),
-  }
+    lines = text.splitlines()
+    return {
+        "dataCutoff": find_key_value(lines, ["data_cutoff", "data cutoff", "数据截止", "数据截至"]),
+        "mustRefreshIf": find_section(lines, ["must_refresh_if", "must refresh if", "刷新边界", "必须刷新"], skip_tables=True),
+        "coreConclusion": find_core_conclusion(lines),
+    }
 
 
 def find_key_value(lines: list[str], keys: list[str]) -> str:
-  lowered_keys = [key.lower() for key in keys]
-  for line in lines[:80]:
-    clean = line.strip().strip("-").strip()
-    low = clean.lower()
-    for key in lowered_keys:
-      if low.startswith(key):
-        value = clean.split(":", 1)[-1].strip() if ":" in clean else clean
-        return value[:240]
-  return ""
+    lowered_keys = [key.lower() for key in keys]
+    for line in lines[:80]:
+        clean = line.strip().strip("-").strip()
+        low = clean.lower()
+        for key in lowered_keys:
+            if low.startswith(key):
+                value = clean.split(":", 1)[-1].strip() if ":" in clean else clean
+                return value[:240]
+    return ""
 
 
 def find_section(lines: list[str], headings: list[str], max_lines: int = 4, skip_tables: bool = False) -> str:
-  heading_keys = [heading.lower() for heading in headings]
-  for index, line in enumerate(lines):
-    clean = line.strip().lstrip("#").strip()
-    low = clean.lower()
-    if any(key in low for key in heading_keys):
-      collected = []
-      for next_line in lines[index + 1:index + 1 + max_lines + 8]:
-        stripped = next_line.strip()
-        if stripped.startswith("#") and collected:
-          break
-        if not stripped:
-          if collected:
-            break
-          continue
-        if skip_tables and is_markdown_table_line(stripped):
-          continue
-        collected.append(clean_summary_text(stripped.strip("-").strip()))
-        if len(collected) >= max_lines:
-          break
-      return " ".join(collected)[:520]
-  return ""
+    heading_keys = [heading.lower() for heading in headings]
+    for index, line in enumerate(lines):
+        clean = line.strip().lstrip("#").strip()
+        low = clean.lower()
+        if any(key in low for key in heading_keys):
+            collected = []
+            for next_line in lines[index + 1:index + 1 + max_lines + 8]:
+                stripped = next_line.strip()
+                if stripped.startswith("#") and collected:
+                    break
+                if not stripped:
+                    if collected:
+                        break
+                    continue
+                if skip_tables and is_markdown_table_line(stripped):
+                    continue
+                collected.append(clean_summary_text(stripped.strip("-").strip()))
+                if len(collected) >= max_lines:
+                    break
+            return " ".join(collected)[:520]
+    return ""
 
 
 def is_markdown_table_line(line: str) -> bool:
-  clean = line.strip()
-  if not clean:
+    clean = line.strip()
+    if not clean:
+        return False
+    if clean.startswith("|") and clean.endswith("|"):
+        return True
+    if re.match(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$", clean):
+        return True
     return False
-  if clean.startswith("|") and clean.endswith("|"):
-    return True
-  if re.match(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$", clean):
-    return True
-  return False
 
 
 def find_core_conclusion(lines: list[str]) -> str:
-  direct = find_inline_value(lines, ["核心判断", "核心结论", "investment view"])
-  if direct:
-    return direct
-  return find_section(lines, ["core conclusion", "核心结论", "结论", "investment view"], skip_tables=True)
+    direct = find_inline_value(lines, ["核心判断", "核心结论", "investment view"])
+    if direct:
+        return direct
+    return find_section(lines, ["core conclusion", "核心结论", "结论", "investment view"], skip_tables=True)
 
 
 def find_inline_value(lines: list[str], keys: list[str]) -> str:
-  lowered_keys = [key.lower() for key in keys]
-  for line in lines[:120]:
-    clean = line.strip().strip("-").strip()
-    if is_markdown_table_line(clean):
-      continue
-    low = clean.lower()
-    for key in lowered_keys:
-      if low.startswith(key):
-        value = re.split(r"[:：]", clean, maxsplit=1)
-        if len(value) > 1 and value[1].strip():
-          return clean_summary_text(value[1])[:520]
-  return ""
+    lowered_keys = [key.lower() for key in keys]
+    for line in lines[:120]:
+        clean = line.strip().strip("-").strip()
+        if is_markdown_table_line(clean):
+            continue
+        low = clean.lower()
+        for key in lowered_keys:
+            if low.startswith(key):
+                value = re.split(r"[:：]", clean, maxsplit=1)
+                if len(value) > 1 and value[1].strip():
+                    return clean_summary_text(value[1])[:520]
+    return ""
 
 
 def clean_summary_text(value: str) -> str:
-  value = re.sub(r"^\*{0,2}\s*(核心判断|核心结论|investment view)\s*[:：]\s*\*{0,2}\s*", "", value.strip(), flags=re.I)
-  value = re.sub(r"^\*{1,2}|\*{1,2}$", "", value).strip()
-  return value
+    value = re.sub(r"^\*{0,2}\s*(核心判断|核心结论|investment view)\s*[:：]\s*\*{0,2}\s*", "", value.strip(), flags=re.I)
+    value = re.sub(r"^\*{1,2}|\*{1,2}$", "", value).strip()
+    return value
 
 
 class MiraBoardHandler(SimpleHTTPRequestHandler):
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, directory=str(APP_ROOT), **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(APP_ROOT), **kwargs)
 
-  def do_GET(self):
-    try:
-      self.handle_GET()
-    except Exception as exc:
-      self.send_json({"status": "error", "message": f"服务内部错误：{str(exc)[:180]}"}, code=500)
+    def do_GET(self):
+        try:
+            self.handle_GET()
+        except Exception as exc:
+            self.send_json({"status": "error", "message": f"服务内部错误：{str(exc)[:180]}"}, code=500)
 
-  def handle_GET(self):
-    parsed = urlparse(self.path)
-    path = unquote(parsed.path)
-    if path == "/api/bootstrap":
-      self.send_json(build_bootstrap())
-      return
-    if path == "/api/research-index":
-      self.send_json(scan_research_index())
-      return
-    if path == "/api/provider-status":
-      self.send_json(read_provider_status())
-      return
-    if path == "/api/position-reviews":
-      self.send_json(read_position_reviews())
-      return
-    if path == "/api/source-file":
-      params = parse_qs(parsed.query)
-      self.send_json(read_source_file(params.get("path", [""])[0]))
-      return
-    if path == "/api/quote":
-      params = parse_qs(parsed.query)
-      self.send_json(fetch_quote_snapshot(
-          params.get("symbol", [""])[0],
-          params.get("market", [""])[0],
-      ))
-      return
-    if path == "/api/quotes":
-      params = parse_qs(parsed.query)
-      pairs = parse_quote_pairs(
-          params.get("symbols", [""])[0],
-          params.get("markets", [""])[0] if params.get("markets") else "",
-      )
-      with ThreadPoolExecutor(max_workers=min(8, max(1, len(pairs)))) as executor:
-        quotes = list(executor.map(lambda pair: fetch_quote_snapshot(*pair), pairs))
-      self.send_json({"status": "ok", "count": len(quotes), "quotes": quotes})
-      return
-    if path == "/api/market-session":
-      self.send_json(a_share_market_session())
-      return
-    if path == "/api/health":
-      self.send_json({
-        "status": "ok",
-        "appRoot": str(APP_ROOT),
-        "miraRoot": str(MIRA_ROOT),
-        "researchRootExists": RESEARCH_ROOT.exists(),
-        "providerStatusExists": PROVIDER_STATUS_PATH.exists(),
-        "stockApiInstalled": STOCK_API_PACKAGE_PATH.exists(),
-      })
-      return
-    if path == "/api/ai-config":
-      self.send_json({"status": "ok", "config": public_ai_config()})
-      return
-    if path.startswith("/api/"):
-      self.send_json({"status": "error", "message": f"unknown endpoint: {path}"}, code=404)
-      return
-    if not is_public_static_path(path):
-      self.send_error(404, "Not found")
-      return
-    super().do_GET()
+    def handle_GET(self):
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        if path.startswith("/api/") and not is_trusted_local_request(self.headers):
+            self.send_json({"status": "error", "message": "已拒绝跨站或非本机 API 请求"}, code=403)
+            return
+        if path == "/api/bootstrap":
+            self.send_json(build_bootstrap())
+            return
+        if path == "/api/research-index":
+            self.send_json(scan_research_index(), code=200)
+            return
+        if path == "/api/provider-status":
+            self.send_json(read_provider_status())
+            return
+        if path == "/api/position-reviews":
+            self.send_json(read_position_reviews(), code=200)
+            return
+        if path == "/api/source-file":
+            params = parse_qs(parsed.query)
+            self.send_json(read_source_file(params.get("path", [""])[0]))
+            return
+        if path == "/api/quote":
+            params = parse_qs(parsed.query)
+            self.send_json(fetch_quote_snapshot(
+                    params.get("symbol", [""])[0],
+                    params.get("market", [""])[0],
+            ))
+            return
+        if path == "/api/quotes":
+            params = parse_qs(parsed.query)
+            pairs = parse_quote_pairs(
+                    params.get("symbols", [""])[0],
+                    params.get("markets", [""])[0] if params.get("markets") else "",
+            )
+            if not QUOTE_BATCH_SEMAPHORE.acquire(blocking=False):
+                self.send_json({"status": "busy", "message": "批量行情任务繁忙，请稍后重试"}, code=429)
+                return
+            try:
+                with ThreadPoolExecutor(max_workers=min(8, max(1, len(pairs)))) as executor:
+                    quotes = list(executor.map(lambda pair: fetch_quote_snapshot(*pair), pairs))
+            finally:
+                QUOTE_BATCH_SEMAPHORE.release()
+            self.send_json({"status": "ok", "count": len(quotes), "quotes": quotes})
+            return
+        if path == "/api/market-session":
+            self.send_json(a_share_market_session())
+            return
+        if path == "/api/health":
+            self.send_json({
+                "status": "ok",
+                "appRoot": str(APP_ROOT),
+                "serverSourceHash": SERVER_SOURCE_HASH,
+                "miraRoot": str(MIRA_ROOT),
+                "researchRootExists": RESEARCH_ROOT.exists(),
+                "providerStatusExists": PROVIDER_STATUS_PATH.exists(),
+                "stockApiInstalled": STOCK_API_PACKAGE_PATH.exists(),
+            })
+            return
+        if path == "/api/ai-config":
+            self.send_json({"status": "ok", "config": public_ai_config()})
+            return
+        if path.startswith("/api/"):
+            self.send_json({"status": "error", "message": f"unknown endpoint: {path}"}, code=404)
+            return
+        if not is_public_static_path(path):
+            self.send_error(404, "Not found")
+            return
+        super().do_GET()
 
-  def do_HEAD(self):
-    path = unquote(urlparse(self.path).path)
-    if path.startswith("/api/") or not is_public_static_path(path):
-      self.send_error(404, "Not found")
-      return
-    super().do_HEAD()
+    def do_HEAD(self):
+        path = unquote(urlparse(self.path).path)
+        if path.startswith("/api/") or not is_public_static_path(path):
+            self.send_error(404, "Not found")
+            return
+        super().do_HEAD()
 
-  def do_POST(self):
-    try:
-      if not self.is_trusted_post_origin():
-        self.send_json({"status": "error", "message": "已拒绝来自其他网页的请求"}, code=403)
+    def do_POST(self):
+        try:
+            if not self.is_trusted_post_origin():
+                self.send_json({"status": "error", "message": "已拒绝来自其他网页的请求"}, code=403)
+                return
+            self.handle_POST()
+        except ValueError as exc:
+            self.send_json({"status": "error", "message": str(exc)}, code=400)
+        except Exception as exc:
+            self.send_json({"status": "error", "message": f"服务内部错误：{str(exc)[:180]}"}, code=500)
+
+    def handle_POST(self):
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        if path == "/api/update-market":
+            payload = self.read_json_body()
+            self.send_json(update_market_snapshot(
+                    payload.get("symbol", ""),
+                    payload.get("market", ""),
+                    payload.get("confirmationToken", ""),
+            ))
+            return
+        if path == "/api/update-news":
+            payload = self.read_json_body()
+            self.send_json(update_industry_news(
+                    payload.get("symbol", ""),
+                    payload.get("market", ""),
+                    payload.get("confirmationToken", ""),
+            ))
+            return
+        if path == "/api/ai-config":
+            self.send_json(save_ai_config(self.read_json_body()))
+            return
+        if path == "/api/ai-test":
+            self.send_json(test_ai_connection())
+            return
+        if path == "/api/portfolio-archive":
+            self.send_json(archive_portfolio_snapshot(self.read_json_body()))
+            return
+        if path == "/api/overview-quotes-archive":
+            self.send_json(archive_overview_quotes(self.read_json_body()))
+            return
+        if path == "/api/overview-history-refresh":
+            self.send_json(refresh_tushare_history(self.read_json_body()))
+            return
+        self.send_json({"status": "error", "message": f"unknown endpoint: {path}"}, code=404)
+
+    def is_trusted_post_origin(self) -> bool:
+        return is_trusted_local_request(self.headers)
+
+    def read_json_body(self) -> dict:
+        try:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            if length < 0:
+                raise ValueError("request body length is invalid")
+            if length > 1_000_000:
+                raise ValueError("request body is too large")
+            raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+            payload = json.loads(raw or "{}")
+            if not isinstance(payload, dict):
+                raise ValueError("request body must be a JSON object")
+            return payload
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("request body is not valid JSON") from exc
+
+    def send_json(self, payload: dict, code: int | None = None):
+        if code is None:
+            code = {
+                    "error": 400,
+                    "missing": 404,
+                    "unsupported": 422,
+                    "confirmation_required": 428,
+            }.get(payload.get("status"), 200)
+        body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        super().end_headers()
+
+    def log_message(self, format, *args):
         return
-      self.handle_POST()
-    except ValueError as exc:
-      self.send_json({"status": "error", "message": str(exc)}, code=400)
-    except Exception as exc:
-      self.send_json({"status": "error", "message": f"服务内部错误：{str(exc)[:180]}"}, code=500)
-
-  def handle_POST(self):
-    parsed = urlparse(self.path)
-    path = unquote(parsed.path)
-    if path == "/api/update-market":
-      payload = self.read_json_body()
-      self.send_json(update_market_snapshot(
-          payload.get("symbol", ""),
-          payload.get("market", ""),
-          payload.get("confirmationToken", ""),
-      ))
-      return
-    if path == "/api/update-news":
-      payload = self.read_json_body()
-      self.send_json(update_industry_news(
-          payload.get("symbol", ""),
-          payload.get("market", ""),
-          payload.get("confirmationToken", ""),
-      ))
-      return
-    if path == "/api/ai-config":
-      self.send_json(save_ai_config(self.read_json_body()))
-      return
-    if path == "/api/ai-test":
-      self.send_json(test_ai_connection())
-      return
-    if path == "/api/portfolio-archive":
-      self.send_json(archive_portfolio_snapshot(self.read_json_body()))
-      return
-    if path == "/api/overview-quotes-archive":
-      self.send_json(archive_overview_quotes(self.read_json_body()))
-      return
-    if path == "/api/overview-history-refresh":
-      self.send_json(refresh_tushare_history(self.read_json_body()))
-      return
-    self.send_json({"status": "error", "message": f"unknown endpoint: {path}"}, code=404)
-
-  def is_trusted_post_origin(self) -> bool:
-    origin = self.headers.get("Origin")
-    host = (self.headers.get("Host") or "").lower()
-    host_name = urlparse(f"//{host}").hostname or ""
-    if host_name not in {"127.0.0.1", "localhost", "::1"}:
-      return False
-    if not origin:
-      return True
-    parsed = urlparse(origin)
-    return parsed.scheme in {"http", "https"} and parsed.netloc.lower() == host and parsed.hostname in {
-        "127.0.0.1", "localhost", "::1",
-    }
-
-  def read_json_body(self) -> dict:
-    try:
-      length = int(self.headers.get("Content-Length", "0") or "0")
-      if length < 0:
-        raise ValueError("request body length is invalid")
-      if length > 1_000_000:
-        raise ValueError("request body is too large")
-      raw = self.rfile.read(length).decode("utf-8") if length else "{}"
-      payload = json.loads(raw or "{}")
-      if not isinstance(payload, dict):
-        raise ValueError("request body must be a JSON object")
-      return payload
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-      raise ValueError("request body is not valid JSON") from exc
-
-  def send_json(self, payload: dict, code: int | None = None):
-    if code is None:
-      code = {
-          "error": 400,
-          "missing": 404,
-          "unsupported": 422,
-          "confirmation_required": 428,
-      }.get(payload.get("status"), 200)
-    body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
-    self.send_response(code)
-    self.send_header("Content-Type", "application/json; charset=utf-8")
-    self.send_header("Content-Length", str(len(body)))
-    self.end_headers()
-    self.wfile.write(body)
-
-  def end_headers(self):
-    self.send_header("Cache-Control", "no-store")
-    self.send_header("X-Content-Type-Options", "nosniff")
-    self.send_header("X-Frame-Options", "DENY")
-    self.send_header("Referrer-Policy", "no-referrer")
-    self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-    super().end_headers()
-
-  def log_message(self, format, *args):
-    return
 
 
 def main():
-  mimetypes.add_type("application/javascript; charset=utf-8", ".js")
-  mimetypes.add_type("text/css; charset=utf-8", ".css")
-  port = int(os.environ.get("MIRABOARD_PORT", "5178"))
-  server = ThreadingHTTPServer(("127.0.0.1", port), MiraBoardHandler)
-  print(f"MiraBoard: http://127.0.0.1:{port}")
-  print(f"Mira root: {MIRA_ROOT}")
-  server.serve_forever()
+    mimetypes.add_type("application/javascript; charset=utf-8", ".js")
+    mimetypes.add_type("text/css; charset=utf-8", ".css")
+    port = int(os.environ.get("MIRABOARD_PORT", "5178"))
+    server = ThreadingHTTPServer(("127.0.0.1", port), MiraBoardHandler)
+    print(f"MiraBoard: http://127.0.0.1:{port}")
+    print(f"Mira root: {MIRA_ROOT}")
+    server.serve_forever()
 
 
 if __name__ == "__main__":
-  main()
+    main()
