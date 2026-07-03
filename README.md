@@ -56,6 +56,8 @@
   - `/api/source-file`
 - `/api/quote`
 - `/api/quotes`：单次最多 40 个标的，同时最多运行 2 个批量任务；跨站浏览器请求会被拒绝。
+- A 股期权由 Mira Provider 统一路由：Eastmoney 主源，Sina 行情/希腊值一级降级，AKShare 可选降级；SSE 官方合约数据用于独立校验。MiraBoard 仅保留 Sina 单合约接口作为最终兜底。
+- 期权批量请求可传 `underlyings`，与 `symbols` 一一对应；同一标的的期权链短时缓存，避免重复请求。
 - `/api/update-market`、`/api/update-news`：首次调用只生成完整预览和一次性确认令牌；只有用户在界面确认后，第二次调用才写入对应 Mira 更新文件。
 - API 模式下，研究总览和标的库会使用真实 Mira `private/research` 对象索引。
 - 详情页资料库支持 Markdown / CSV / 文本文件的只读正文预览。

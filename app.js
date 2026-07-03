@@ -1,3 +1,40 @@
+const requiredClientModules = [
+  ["MiraBoardSecurity", "frontend_security.js"],
+  ["MiraBoardDataUtils", "data_utils.js"],
+  ["MiraBoardMarkdown", "markdown_renderer.js"],
+];
+const missingClientModules = requiredClientModules.filter(([name]) => !globalThis[name]);
+
+if (missingClientModules.length) {
+  const body = document.body || document.documentElement;
+  if (body) {
+    body.innerHTML = "";
+    const shell = document.createElement("div");
+    shell.className = "app-shell";
+    const main = document.createElement("main");
+    main.className = "main-surface";
+    main.style.minHeight = "100vh";
+    main.style.display = "grid";
+    main.style.placeItems = "center";
+    const panel = document.createElement("section");
+    panel.className = "empty-state";
+    panel.style.maxWidth = "720px";
+    panel.style.margin = "48px auto";
+    panel.style.textAlign = "left";
+    const title = document.createElement("h1");
+    title.textContent = "资源加载失败";
+    const message = document.createElement("p");
+    message.textContent = `MiraBoard 的基础脚本未能完整加载：${missingClientModules.map(([, file]) => file).join("、")}。请刷新页面，或确认本地文件没有缺失。`;
+    const hint = document.createElement("p");
+    hint.textContent = "页面已保留本地提示，不会直接白屏。";
+    panel.append(title, message, hint);
+    main.append(panel);
+    shell.append(main);
+    body.append(shell);
+  }
+  throw new Error(`MiraBoard client modules missing: ${missingClientModules.map(([, file]) => file).join(", ")}`);
+}
+
 const { escapeHtml } = globalThis.MiraBoardSecurity;
 const { parseCsv, csvNumberOrNull } = globalThis.MiraBoardDataUtils;
 const { buildMemoSummaryMarkdown, renderMarkdownPreview } = globalThis.MiraBoardMarkdown;
@@ -135,11 +172,11 @@ const portfolioPositions = [
   { account: "stock", code: "002128.SZ", displayCode: "002128", name: "电投能源", quantity: 11100, cost: 29.603, price: 23.980, marketValue: 266178.00, costBasis: 328593.97, profit: -62415.97, previousClose: null },
   { account: "stock", code: "600276.SH", displayCode: "600276", name: "恒瑞医药", quantity: 4400, cost: 52.000, price: 52.000, marketValue: 228800.00, costBasis: 228800.00, profit: 0.00, previousClose: null },
   { account: "stock", code: "159992.SZ", displayCode: "159992", name: "创新药", quantity: 318200, cost: 0.773, price: 0.753, marketValue: 239604.60, costBasis: 245993.20, profit: -6388.60, previousClose: null },
-  { account: "option", code: "10011641", name: "沪-科创50购9月2100", optionType: "认购", quantity: 15, cost: 0.14085, price: 0.19440, marketValue: 29160.00, costBasis: 21127.50, profit: 8032.50, previousClose: null, multiplier: 10000 },
-  { account: "option", code: "10011041", name: "沪-科创50沽9月1800", optionType: "认沽", quantity: 20, cost: 0.13665, price: 0.10840, marketValue: 21680.00, costBasis: 27330.00, profit: -5650.00, previousClose: null, multiplier: 10000 },
-  { account: "option", code: "10011563", name: "沪-科创50沽9月1900", optionType: "认沽", quantity: 20, cost: 0.18345, price: 0.14750, marketValue: 29500.00, costBasis: 36690.00, profit: -7190.00, previousClose: null, multiplier: 10000 },
-  { account: "option", code: "10011752", name: "沪-科创50沽7月2100", optionType: "认沽", quantity: 11, cost: 0.09540, price: 0.09540, marketValue: 10494.00, costBasis: 10494.00, profit: 0.00, previousClose: null, multiplier: 10000 },
-  { account: "option", code: "10011035", name: "沪-科创50沽9月1500", optionType: "认沽", quantity: 71, cost: 0.05219, price: 0.03450, marketValue: 24495.00, costBasis: 37052.83, profit: -12557.83, previousClose: null, multiplier: 10000 },
+  { account: "option", code: "10011641", underlying: "588000", name: "沪-科创50购9月2100", optionType: "认购", quantity: 15, cost: 0.14085, price: 0.19440, marketValue: 29160.00, costBasis: 21127.50, profit: 8032.50, previousClose: null, multiplier: 10000 },
+  { account: "option", code: "10011041", underlying: "588000", name: "沪-科创50沽9月1800", optionType: "认沽", quantity: 20, cost: 0.13665, price: 0.10840, marketValue: 21680.00, costBasis: 27330.00, profit: -5650.00, previousClose: null, multiplier: 10000 },
+  { account: "option", code: "10011563", underlying: "588000", name: "沪-科创50沽9月1900", optionType: "认沽", quantity: 20, cost: 0.18345, price: 0.14750, marketValue: 29500.00, costBasis: 36690.00, profit: -7190.00, previousClose: null, multiplier: 10000 },
+  { account: "option", code: "10011752", underlying: "588000", name: "沪-科创50沽7月2100", optionType: "认沽", quantity: 11, cost: 0.09540, price: 0.09540, marketValue: 10494.00, costBasis: 10494.00, profit: 0.00, previousClose: null, multiplier: 10000 },
+  { account: "option", code: "10011035", underlying: "588000", name: "沪-科创50沽9月1500", optionType: "认沽", quantity: 71, cost: 0.05219, price: 0.03450, marketValue: 24495.00, costBasis: 37052.83, profit: -12557.83, previousClose: null, multiplier: 10000 },
 ];
 const portfolioAccounts = {
   stock: { totalAssets: 1117153.92, marketValue: 1113635.60, cash: 3518.32, profit: -237744.84 },
@@ -1600,8 +1637,47 @@ async function refreshPortfolioPrices(options = {}) {
     statusNode.textContent = "正在自动刷新股票和期权行情...";
   }
   const positions = portfolioPositions.filter(position => position.account === "stock" || position.account === "option");
-  portfolioDailyProfitReady = false;
-  portfolioDailyProfitSourceDate = "";
+  const previousState = {
+    dailyProfitReady: portfolioDailyProfitReady,
+    dailyProfitSourceDate: portfolioDailyProfitSourceDate,
+    quoteCache: new Map(portfolioQuoteCache),
+    positions: portfolioPositions.map(position => ({
+      position,
+      price: position.price,
+      previousClose: position.previousClose,
+      quoteStatus: position.quoteStatus,
+      quoteError: position.quoteError,
+      marketValue: position.marketValue,
+      profit: position.profit,
+      quote: position.quote,
+      optionQuote: position.optionQuote,
+    })),
+    objects: objects.map(object => ({
+      object,
+      quote: object.quote,
+      detailSummary: object.detailSummary,
+    })),
+  };
+  const restorePreviousState = () => {
+    portfolioDailyProfitReady = previousState.dailyProfitReady;
+    portfolioDailyProfitSourceDate = previousState.dailyProfitSourceDate;
+    portfolioQuoteCache.clear();
+    previousState.quoteCache.forEach((quote, key) => portfolioQuoteCache.set(key, quote));
+    previousState.positions.forEach(snapshot => {
+      snapshot.position.price = snapshot.price;
+      snapshot.position.previousClose = snapshot.previousClose;
+      snapshot.position.quoteStatus = snapshot.quoteStatus;
+      snapshot.position.quoteError = snapshot.quoteError;
+      snapshot.position.marketValue = snapshot.marketValue;
+      snapshot.position.profit = snapshot.profit;
+      snapshot.position.quote = snapshot.quote;
+      snapshot.position.optionQuote = snapshot.optionQuote;
+    });
+    previousState.objects.forEach(snapshot => {
+      snapshot.object.quote = snapshot.quote;
+      snapshot.object.detailSummary = snapshot.detailSummary;
+    });
+  };
   const asOfDate = getPortfolioAsOfDate();
   const transactionTargets = ["stock", "option"].flatMap(account =>
     getPortfolioTransactionsForDate(account, asOfDate)
@@ -1622,27 +1698,39 @@ async function refreshPortfolioPrices(options = {}) {
     if (statusNode) {
       statusNode.textContent = `${silent ? "正在自动刷新" : "正在刷新"}股票和期权行情...`;
     }
-    const symbols = refreshTargets.map(target => String(target.code || "").trim()).join(",");
-    const markets = refreshTargets.map(target => target.account === "option" ? "期权" : "A股").join(",");
-    const payload = await fetchJsonWithTimeout(
-      `/api/quotes?symbols=${encodeURIComponent(symbols)}&markets=${encodeURIComponent(markets)}`,
-      {},
-      25000,
-    );
-    const quotes = Array.isArray(payload?.quotes) ? payload.quotes : [];
-    refreshTargets.forEach((target, index) => {
-      const result = quotes[index];
-      const price = toFiniteNumberOrNull(result?.price);
-      const previousClose = toFiniteNumberOrNull(result?.previousClose);
-      const code = normalizePortfolioCode(target.code, target.account);
-      if (result?.status !== "ok" || price == null || previousClose == null || !result?.sourceDate) {
-        failures.push(`${target.code}:${result?.message || result?.status || "bad payload"}`);
-        applyQuoteToLinkedState(code, result || { status: "source_gap", message: "行情未返回" }, target.account);
-        return;
-      }
-      applyQuoteToLinkedState(code, result, target.account);
-      updated += 1;
-    });
+    const quotes = new Array(refreshTargets.length);
+    const groups = ["stock", "option"].map(account => refreshTargets
+      .map((target, index) => ({ target, index }))
+      .filter(item => item.target.account === account));
+    for (const group of groups) {
+      if (!group.length) continue;
+      const symbols = group.map(({ target }) => String(target.code || "").trim()).join(",");
+      const markets = group.map(({ target }) => target.account === "option" ? "期权" : "A股").join(",");
+      const underlyings = group.map(({ target }) => {
+        if (target.account !== "option") return "";
+        return target.underlying || portfolioPositions.find(position => position.code === target.code)?.underlying || "";
+      }).join(",");
+      const payload = await fetchJsonWithTimeout(
+        `/api/quotes?symbols=${encodeURIComponent(symbols)}&markets=${encodeURIComponent(markets)}&underlyings=${encodeURIComponent(underlyings)}`,
+        {},
+        group[0].target.account === "option" ? 120000 : 30000,
+      );
+      const groupQuotes = Array.isArray(payload?.quotes) ? payload.quotes : [];
+      group.forEach(({ target, index }, groupIndex) => {
+        const result = groupQuotes[groupIndex];
+        quotes[index] = result;
+        const price = toFiniteNumberOrNull(result?.price);
+        const previousClose = toFiniteNumberOrNull(result?.previousClose);
+        const code = normalizePortfolioCode(target.code, target.account);
+        if (result?.status !== "ok" || price == null || previousClose == null || !result?.sourceDate) {
+          failures.push(`${target.code}:${result?.message || result?.status || "bad payload"}`);
+          applyQuoteToLinkedState(code, result || { status: "source_gap", message: "行情未返回" }, target.account);
+          return;
+        }
+        applyQuoteToLinkedState(code, result, target.account);
+        updated += 1;
+      });
+    }
     const underlyingCodes = [...new Set(quotes.map(quote => String(quote?.underlyingCode || "").trim()).filter(Boolean))];
     let underlyingQuotes = [];
     if (underlyingCodes.length) {
@@ -1664,10 +1752,14 @@ async function refreshPortfolioPrices(options = {}) {
       updated === refreshTargets.length &&
       sourceDates.length === 1
     );
-    portfolioDailyProfitReady = refreshComplete;
-    portfolioDailyProfitSourceDate = refreshComplete ? sourceDates[0] : "";
-    if (refreshComplete) syncPortfolioSeriesToLatestQuote();
-    await syncPortfolioBenchmarkToLatest();
+    if (refreshComplete) {
+      portfolioDailyProfitReady = true;
+      portfolioDailyProfitSourceDate = sourceDates[0];
+      syncPortfolioSeriesToLatestQuote();
+      await syncPortfolioBenchmarkToLatest();
+    } else {
+      restorePreviousState();
+    }
     if (refreshComplete) {
       const stockSnapshot = portfolioSnapshot("stock");
       const seriesPoint = portfolioPerformanceData?.series?.find(point => point.date === sourceDates[0]);
@@ -1703,11 +1795,6 @@ async function refreshPortfolioPrices(options = {}) {
         underlyingCodes,
         underlyingQuotes,
       }));
-    } else if (!refreshComplete) {
-      const priorState = getPortfolioRefreshState();
-      if (!(priorState?.complete === true && getSavedPortfolioSourceDate(priorState) === expectedQuoteDate)) {
-        localStorage.removeItem(PORTFOLIO_REFRESH_STATE_KEY);
-      }
     }
     renderPortfolio();
     renderCards(getActiveOverviewFilter());
@@ -1718,13 +1805,17 @@ async function refreshPortfolioPrices(options = {}) {
       statusNode.textContent = refreshComplete
         ? `${trigger === "auto" ? "收盘行情已自动更新" : "行情已手动更新"} ${updated}/${refreshTargets.length} · ${now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`
         : updated
-          ? `行情仅更新 ${updated}/${refreshTargets.length} · 今日收益暂不计算 · ${now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`
-        : `行情更新失败，保留账户快照价格${failures.length ? ` · ${failures[0]}` : ""}`;
+          ? `行情仅返回 ${updated}/${refreshTargets.length}，未采用本轮数据 · 已保留刷新前行情和今日收益`
+          : `行情更新失败，已保留刷新前行情和今日收益${failures.length ? ` · ${failures[0]}` : ""}`;
     }
     return refreshComplete;
   } catch (error) {
+    restorePreviousState();
+    renderPortfolio();
+    renderCards(getActiveOverviewFilter());
+    renderTargets(getActiveTargetFilter());
     if (statusNode) {
-      statusNode.textContent = "行情更新失败，保留账户快照价格";
+      statusNode.textContent = "行情更新失败，已保留刷新前行情和今日收益";
     }
     return false;
   } finally {
@@ -3421,7 +3512,6 @@ function attachUpdateButtons() {
         );
       } else if (payload?.status === "existing") {
         setUpdateStatus("ok", `已读取当日文件：${payload.title} · 未重复写入`);
-        await openFullscreenPreview(payload.path);
       } else {
         setUpdateStatus(
           payload?.status === "ok" ? "ok" : "warn",
@@ -3429,6 +3519,9 @@ function attachUpdateButtons() {
             ? `market-update 已写入：${payload.title || "今日走势文档"} · 数据截止 ${quote?.sourceDate || "未知"}`
             : `行情刷新未完成：${status}`
         );
+      }
+      if (["ok", "read_only", "existing"].includes(payload?.status) && payload?.path) {
+        await openFullscreenPreview(payload.path);
       }
       if (payload?.status === "ok") {
         prependActivity(

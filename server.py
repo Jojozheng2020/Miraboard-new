@@ -41,6 +41,9 @@ PORTFOLIO_ARCHIVE_LOCK = threading.Lock()
 OVERVIEW_QUOTES_PATH = APP_ROOT / "data" / "overview-quotes.csv"
 OVERVIEW_QUOTES_LOCK = threading.Lock()
 QUOTE_BATCH_SEMAPHORE = threading.BoundedSemaphore(2)
+OPTION_SURFACE_LOCK = threading.Lock()
+OPTION_SURFACE_CACHE: dict[str, dict] = {}
+OPTION_SURFACE_TTL_SECONDS = 15
 OVERVIEW_HISTORY_PATH = APP_ROOT / "data" / "overview-price-history.csv"
 OVERVIEW_HISTORY_LOCK = threading.Lock()
 TUSHARE_HISTORY_ADAPTER_PATH = APP_ROOT / "tushare_history_adapter.py"
@@ -1029,10 +1032,13 @@ def normalize_yahoo_symbol(ticker: str, market: str = "") -> str:
     return raw
 
 
-def fetch_quote_snapshot(ticker: str, market: str = "") -> dict:
+def fetch_quote_snapshot(ticker: str, market: str = "", underlying: str = "") -> dict:
     raw_ticker = (ticker or "").strip().upper()
     if re.fullmatch(r"\d{8}", raw_ticker):
-        return fetch_option_quote_snapshot(raw_ticker)
+        return (
+            fetch_option_quote_snapshot(raw_ticker, underlying=underlying)
+            if underlying else fetch_option_quote_snapshot(raw_ticker)
+        )
     normalized_market = normalize_market_arg(ticker, market)
     if normalized_market == "A股":
         primary = fetch_eastmoney_quote_snapshot(ticker, normalized_market)
@@ -1345,10 +1351,148 @@ def infer_previous_close(meta: dict, history: list[dict]) -> float | None:
     return None
 
 
-def fetch_option_quote_snapshot(contract_code: str) -> dict:
+def fetch_mira_option_surface(underlying: str) -> dict:
+    code = str(underlying or "").strip()
+    if not re.fullmatch(r"\d{6}", code):
+        raise ValueError("option underlying is required")
+    now = time.monotonic()
+    with OPTION_SURFACE_LOCK:
+        cached = OPTION_SURFACE_CACHE.get(code)
+        if cached and now - cached["cached_at"] < OPTION_SURFACE_TTL_SECONDS:
+            return cached["payload"]
+
+        tools_path = MIRA_ROOT / "tools"
+        if not tools_path.is_dir():
+            raise RuntimeError("Mira tools/mira_data is unavailable")
+        tools_value = str(tools_path)
+        if tools_value not in sys.path:
+            sys.path.insert(0, tools_value)
+        from mira_data.market import route_a_share_option_chain
+
+        routed = route_a_share_option_chain(code)
+        rows = ((routed.result.series or {}).get("rows") or [])
+        provider = routed.provider
+        attempts = list(routed.attempts)
+        if routed.provider == "eastmoney":
+            try:
+                supplement = route_a_share_option_chain(code, providers=("sina_options",))
+                supplement_rows = {
+                    str(row.get("contract_code") or ""): row
+                    for row in ((supplement.result.series or {}).get("rows") or [])
+                }
+                rows = [
+                    {
+                        **row,
+                        **{
+                            key: value for key, value in supplement_rows.get(str(row.get("contract_code") or ""), {}).items()
+                            if value not in (None, "")
+                        },
+                    }
+                    for row in rows
+                ]
+                provider = "eastmoney+sina_options"
+                attempts.extend(supplement.attempts)
+            except Exception as exc:
+                attempts.append({"provider": "sina_options", "status": "failed", "error": str(exc)[:180]})
+        payload = {
+            "provider": provider,
+            "attempts": attempts,
+            "rows": rows,
+            "records": routed.result.records,
+        }
+        OPTION_SURFACE_CACHE[code] = {"cached_at": time.monotonic(), "payload": payload}
+        return payload
+
+
+def option_quote_quality(row: dict) -> dict:
+    flags = []
+    bid = row.get("bid_price")
+    ask = row.get("ask_price")
+    if not isinstance(bid, (int, float)) or not isinstance(ask, (int, float)):
+        flags.append("missing_bid_ask")
+    elif ask < bid:
+        flags.append("crossed_market")
+    elif ask and (ask - bid) / ask > 0.15:
+        flags.append("wide_spread")
+    if not isinstance(row.get("open_interest"), (int, float)):
+        flags.append("missing_open_interest")
+    quote_time = str(row.get("quote_time") or "")
+    if not quote_time:
+        flags.append("delayed_or_close_only")
+    return {
+        "level": "good" if not flags else ("limited" if len(flags) <= 2 else "weak"),
+        "flags": flags,
+    }
+
+
+def option_row_to_quote(code: str, underlying: str, surface: dict, row: dict) -> dict:
+    price = row.get("last_price")
+    previous = row.get("previous_close")
+    change = price - previous if isinstance(price, (int, float)) and isinstance(previous, (int, float)) else row.get("change")
+    change_pct = row.get("change_pct")
+    if not isinstance(change_pct, (int, float)) and isinstance(change, (int, float)) and previous:
+        change_pct = change / previous * 100
+    quote_time = str(row.get("quote_time") or "")
+    records = surface.get("records") or []
+    record_date = str(getattr(records[0], "source_date", "") or "") if records else ""
+    source_date = quote_time[:10] if len(quote_time) >= 10 else (record_date or current_china_market_date().isoformat())
+    provider = str(surface.get("provider") or "unknown")
+    return {
+        "status": "ok",
+        "symbol": code,
+        "normalizedSymbol": code,
+        "market": "期权",
+        "provider": f"mira_provider:{provider}",
+        "sourceId": row.get("vendor_source") or provider,
+        "primaryProvider": "mira_option_router",
+        "fallbackUsed": provider != "eastmoney",
+        "providerAttempts": surface.get("attempts") or [],
+        "price": price,
+        "previousClose": previous,
+        "change": change,
+        "changePct": change_pct,
+        "currency": "CNY",
+        "volume": row.get("volume"),
+        "history": [],
+        "sourceDate": source_date,
+        "quoteTime": quote_time,
+        "underlyingCode": row.get("underlying_code") or underlying,
+        "optionType": row.get("option_type"),
+        "strikePrice": row.get("strike_price"),
+        "expiryDate": row.get("expiry_date"),
+        "bid": row.get("bid_price"),
+        "ask": row.get("ask_price"),
+        "openInterest": row.get("open_interest"),
+        "impliedVolatility": row.get("implied_volatility"),
+        "delta": row.get("delta"),
+        "gamma": row.get("gamma"),
+        "theta": row.get("theta"),
+        "vega": row.get("vega"),
+        "quality": option_quote_quality(row),
+        "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+    }
+
+
+def fetch_option_quote_snapshot(contract_code: str, underlying: str = "") -> dict:
     code = str(contract_code or "").strip()
     if not re.fullmatch(r"\d{8}", code):
         return quote_gap(contract_code, "期权", "a_stock_data_sina_options", "invalid option contract code")
+    attempts = []
+    if underlying:
+        try:
+            surface = fetch_mira_option_surface(underlying)
+            attempts.extend(surface.get("attempts") or [])
+            row = next((item for item in surface.get("rows", []) if str(item.get("contract_code") or item.get("security_id") or "") == code), None)
+            if row:
+                quote = option_row_to_quote(code, underlying, surface, row)
+                if isinstance(quote.get("price"), (int, float)) and isinstance(quote.get("previousClose"), (int, float)):
+                    return quote
+                attempts.append({"provider": surface.get("provider", "mira_option_router"), "status": "incomplete_quote"})
+            else:
+                attempts.append({"provider": surface.get("provider", "mira_option_router"), "status": "contract_missing"})
+        except Exception as exc:
+            attempts.append({"provider": "mira_option_router", "status": "failed", "error": str(exc)[:180]})
+
     symbols = f"CON_OP_{code},CON_SO_{code}"
     url = SINA_OPTION_QUOTE_URL.format(symbols=symbols)
     try:
@@ -1377,6 +1521,9 @@ def fetch_option_quote_snapshot(contract_code: str) -> dict:
             "normalizedSymbol": code,
             "market": "期权",
             "provider": "a_stock_data_sina_options",
+            "primaryProvider": "mira_option_router",
+            "fallbackUsed": bool(underlying),
+            "providerAttempts": [*attempts, {"provider": "sina_contract_quote", "status": "ok"}],
             "price": price,
             "previousClose": previous,
             "change": change,
@@ -1398,6 +1545,7 @@ def fetch_option_quote_snapshot(contract_code: str) -> dict:
             "gamma": row.get("gamma"),
             "theta": row.get("theta"),
             "vega": row.get("vega"),
+            "quality": option_quote_quality(row),
             "url": url,
             "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
         }
@@ -1462,14 +1610,6 @@ def update_market_snapshot(ticker: str, market: str = "", confirmation_token: st
         return confirm_write_preview("market", ticker, confirmation_token)
 
     market_date = current_china_market_date()
-    if market in {"A股", "ETF"} and market_date.weekday() >= 5:
-        return build_market_update_read_only_response(
-            ticker,
-            market,
-            folder,
-            f"{market_date.isoformat()} 为非开盘日",
-        )
-
     quote = fetch_quote_snapshot(ticker, market)
     if quote.get("status") != "ok":
         return {
@@ -1480,14 +1620,21 @@ def update_market_snapshot(ticker: str, market: str = "", confirmation_token: st
         }
 
     source_date = quote.get("sourceDate") or ""
-    if market in {"A股", "ETF"} and source_date != market_date.isoformat():
-        return build_market_update_read_only_response(
-            ticker,
-            market,
-            folder,
-            f"行情源最新交易日为 {source_date or '未知'}，未确认当日开盘",
-            quote=quote,
+    if market in {"A股", "ETF"}:
+        expected_date = (
+            market_date
+            if is_a_share_trading_date(market_date)
+            else previous_a_share_trading_date(market_date)
         )
+        if expected_date is None or source_date != expected_date.isoformat():
+            expected_text = expected_date.isoformat() if expected_date else "未知"
+            return build_market_update_read_only_response(
+                ticker,
+                market,
+                folder,
+                f"行情源最新交易日为 {source_date or '未知'}，预期最近交易日为 {expected_text}",
+                quote=quote,
+            )
 
     analysis = build_market_trend_analysis(quote)
     if analysis.get("status") == "source_gap":
@@ -2571,14 +2718,20 @@ def quote_gap(ticker: str, market: str, provider: str, message: str, *, url: str
     }
 
 
-def parse_quote_pairs(symbols_value: str, markets_value: str, limit: int = 40) -> list[tuple[str, str]]:
+def parse_quote_requests(symbols_value: str, markets_value: str, underlyings_value: str = "", limit: int = 40) -> list[tuple[str, str, str]]:
     symbols = (symbols_value or "").split(",")
     markets = (markets_value or "").split(",") if markets_value else []
+    underlyings = (underlyings_value or "").split(",") if underlyings_value else []
     return [
-        (symbol.strip(), markets[index].strip() if index < len(markets) else "")
+        (symbol.strip(), markets[index].strip() if index < len(markets) else "",
+         underlyings[index].strip() if index < len(underlyings) else "")
         for index, symbol in enumerate(symbols)
         if symbol.strip()
     ][:limit]
+
+
+def parse_quote_pairs(symbols_value: str, markets_value: str, limit: int = 40) -> list[tuple[str, str]]:
+    return [(symbol, market) for symbol, market, _ in parse_quote_requests(symbols_value, markets_value, limit=limit)]
 
 
 def http_get_json(url: str, *, timeout: int = 12) -> dict:
@@ -2940,13 +3093,15 @@ class MiraBoardHandler(SimpleHTTPRequestHandler):
             self.send_json(fetch_quote_snapshot(
                     params.get("symbol", [""])[0],
                     params.get("market", [""])[0],
+                    params.get("underlying", [""])[0],
             ))
             return
         if path == "/api/quotes":
             params = parse_qs(parsed.query)
-            pairs = parse_quote_pairs(
+            pairs = parse_quote_requests(
                     params.get("symbols", [""])[0],
                     params.get("markets", [""])[0] if params.get("markets") else "",
+                    params.get("underlyings", [""])[0] if params.get("underlyings") else "",
             )
             if not QUOTE_BATCH_SEMAPHORE.acquire(blocking=False):
                 self.send_json({"status": "busy", "message": "批量行情任务繁忙，请稍后重试"}, code=429)

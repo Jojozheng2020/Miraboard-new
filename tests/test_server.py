@@ -118,6 +118,14 @@ class MarketAnalysisTests(unittest.TestCase):
         symbols = ",".join(f"{index:06d}.SH" for index in range(80))
         self.assertEqual(len(server.parse_quote_pairs(symbols, "")), 40)
 
+    def test_quote_requests_keep_option_underlying_positions(self):
+        requests = server.parse_quote_requests(
+            "600000.SH,10011641", "A股,期权", ",588000")
+        self.assertEqual(
+            requests,
+            [("600000.SH", "A股", ""), ("10011641", "期权", "588000")],
+        )
+
     def test_bare_ticker_folder_uses_memo_heading_as_company_name(self):
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory) / "603259.SH"
@@ -201,6 +209,29 @@ class MarketAnalysisTests(unittest.TestCase):
             payload = server.fetch_quote_snapshot("10011641", "期权")
         self.assertEqual(payload["provider"], "a_stock_data_sina_options")
         mocked.assert_called_once_with("10011641")
+
+    def test_option_quote_uses_mira_provider_surface(self):
+        surface = {
+            "provider": "sina_options",
+            "attempts": [
+                {"provider": "eastmoney", "status": "failed"},
+                {"provider": "sina_options", "status": "ok"},
+            ],
+            "records": [],
+            "rows": [{
+                "contract_code": "10011641", "underlying_code": "588000",
+                "last_price": 0.2538, "previous_close": 0.1944,
+                "bid_price": 0.2517, "ask_price": 0.2543,
+                "open_interest": 8587, "quote_time": "2026-07-03 15:00:00",
+                "vendor_source": "a_stock_data_sina_option_quote_and_greeks",
+            }],
+        }
+        with patch.object(server, "fetch_mira_option_surface", return_value=surface):
+            payload = server.fetch_option_quote_snapshot("10011641", underlying="588000")
+        self.assertEqual(payload["provider"], "mira_provider:sina_options")
+        self.assertTrue(payload["fallbackUsed"])
+        self.assertEqual(payload["sourceDate"], "2026-07-03")
+        self.assertEqual(payload["quality"]["level"], "good")
 
     def test_a_share_quote_prefers_eastmoney_without_calling_yahoo(self):
         eastmoney = {
@@ -604,6 +635,50 @@ class SafetyTests(unittest.TestCase):
         self.assertIn("60 日最低", written)
         self.assertIn("这部分内容必须保留", written)
         quote_fetch.assert_called_once_with("600000.SH", "A股")
+
+    def test_market_update_uses_latest_trading_day_on_weekend(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder = root / "private" / "research" / "600000.SH_测试公司"
+            folder.mkdir(parents=True)
+            history = [
+                {
+                    "date": f"2026-05-{(index % 28) + 1:02d}",
+                    "open": 10 + index * 0.1,
+                    "high": 10.3 + index * 0.1,
+                    "low": 9.8 + index * 0.1,
+                    "close": 10.1 + index * 0.1,
+                    "volume": 1000 + index,
+                }
+                for index in range(60)
+            ]
+            quote = {
+                "status": "ok",
+                "symbol": "600000.SH",
+                "market": "A股",
+                "provider": "eastmoney",
+                "price": history[-1]["close"],
+                "previousClose": history[-2]["close"],
+                "changePct": 0.63,
+                "currency": "CNY",
+                "volume": 2000,
+                "sourceDate": "2026-07-03",
+                "history": history,
+            }
+            with (
+                patch.object(server, "MIRA_ROOT", root),
+                patch.object(server, "RESEARCH_ROOT", root / "private" / "research"),
+                patch.object(server, "current_china_market_date", return_value=server._dt.date(2026, 7, 4)),
+                patch.object(server, "fetch_quote_snapshot", return_value=quote),
+            ):
+                preview = server.update_market_snapshot("600000.SH", "A股")
+
+        self.assertEqual(preview["status"], "preview")
+        self.assertEqual(preview["title"], "market-update-2026-07-03.md")
+        self.assertEqual(
+            preview["path"],
+            "private/research/600000.SH_测试公司/market-update-2026-07-03.md",
+        )
 
     def test_existing_monitor_skips_news_and_ai_workflow(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -30,5 +30,10 @@ const appSource = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 assert.ok(appSource.includes("escapeHtml(position.name)"));
 assert.ok(appSource.includes("escapeHtml(position.displayCode || position.code)"));
 assert.ok(appSource.includes("escapeHtml(position.optionType)"));
+assert.ok(appSource.includes("资源加载失败"));
+assert.ok(appSource.includes('["ok", "read_only", "existing"].includes(payload?.status) && payload?.path'));
+assert.ok(appSource.includes("restorePreviousState()"));
+assert.ok(appSource.includes("行情更新失败，已保留刷新前行情和今日收益"));
+assert.ok(appSource.includes('group[0].target.account === "option" ? 120000 : 30000'));
 
 console.log("frontend security and data utility tests passed");
