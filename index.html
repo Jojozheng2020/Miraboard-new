@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MiraBoard 投资分析看板</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand">
+        <div class="brand-mark">M</div>
+        <div>
+          <strong>MiraBoard</strong>
+          <span>本地研究看板</span>
+        </div>
+      </div>
+      <nav class="nav-list" id="navList"></nav>
+      <div class="sidebar-footer">
+        <span class="status-dot"></span>
+        <div>
+          <strong>Local only</strong>
+          <span>Mira 仓库只读</span>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-surface">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="sectionEyebrow">研究总览</p>
+          <h1 id="sectionTitle">今日研究状态</h1>
+        </div>
+        <div class="top-actions">
+          <label class="search-box">
+            <span>搜索</span>
+            <input id="searchInput" type="search" placeholder="ticker / 公司 / 行业" />
+          </label>
+          <button class="price-refresh-all-btn" id="refreshAllPricesBtn">
+            <span class="action-icon-small line-chart"></span>
+            刷新全部股价
+          </button>
+          <button class="ghost-btn" id="globalRefreshBtn">刷新队列</button>
+        </div>
+      </header>
+
+      <section class="view active" id="overviewView" aria-labelledby="sectionTitle">
+        <div class="metric-strip overview-metric-strip">
+          <article><span>跟踪标的</span><strong>21</strong><em>private/research 优先</em></article>
+          <article><span>待刷新</span><strong>5</strong><em>含 2 个过期</em></article>
+          <article><span>反转尝试</span><strong>3</strong><em>需确认量能</em></article>
+          <article><span>反转确认</span><strong>0</strong><em>已确认反转结构</em></article>
+        </div>
+
+        <div class="overview-screener-layout">
+          <section class="panel overview-screener-panel">
+            <div class="overview-screener-head">
+              <div>
+                <h2><strong id="overviewCount">0</strong> 个研究标的</h2>
+                <p>持仓优先，其次按研究新鲜度和最近更新时间排序</p>
+              </div>
+              <span class="overview-sort-note" id="overviewQuoteStatus">正在读取本地行情</span>
+            </div>
+            <div class="segmented overview-view-tabs" id="overviewFilters" role="tablist" aria-label="筛选">
+                <button class="selected" data-filter="A股">A 股</button>
+                <button data-filter="港股">港股</button>
+                <button data-filter="美股">美股</button>
+                <button data-filter="大宗商品">大宗商品</button>
+                <button data-filter="ETF">ETF</button>
+            </div>
+            <div class="research-table-wrap">
+              <table class="research-overview-table">
+                <colgroup>
+                  <col class="research-col-symbol" />
+                  <col class="research-col-company" />
+                  <col class="research-col-price" />
+                  <col class="research-col-change" />
+                  <col class="research-col-volume-ratio" />
+                  <col class="research-col-industry" />
+                  <col class="research-col-trend" />
+                  <col class="research-col-state" />
+                  <col class="research-col-freshness" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>代码</th>
+                    <th>公司 / 研究对象</th>
+                    <th class="number-cell">最新价</th>
+                    <th class="number-cell">今日涨跌</th>
+                    <th class="number-cell">量比</th>
+                    <th>所属行业</th>
+                    <th>Mira 走势判断</th>
+                    <th>研究状态</th>
+                    <th>数据新鲜度</th>
+                  </tr>
+                </thead>
+                <tbody id="researchCards"></tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="radarView">
+        <div class="radar-workbench">
+          <section class="panel radar-focus-panel">
+            <div class="panel-header">
+              <div>
+                <h2>今日雷达</h2>
+                <p>把需要立刻处理的刷新、风险和确认信号排成队列</p>
+              </div>
+              <span class="pill amber">行动优先</span>
+            </div>
+            <div id="radarFocusList" class="radar-focus-list"></div>
+          </section>
+
+          <aside class="panel radar-rules-panel">
+            <div class="panel-header compact">
+              <div>
+                <h2>确认规则</h2>
+                <p>升级或降级前必须看的条件</p>
+              </div>
+            </div>
+            <div class="rule-stack">
+              <article><strong>价格</strong><span>站回 trigger_level，或跌破 invalidation_level。</span></article>
+              <article><strong>量能</strong><span>反转尝试必须有成交额和行业宽度配合。</span></article>
+              <article><strong>证据</strong><span>政策、公告、财报和研报只作为不同强度的证据源。</span></article>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" id="portfolioView">
+        <div class="portfolio-command-bar">
+          <div>
+            <div class="portfolio-status-line">
+              <span class="pill blue">账户快照</span>
+              <span id="portfolioUpdatedAt">已更新至 2026-06-30 成交截图 · 当日费用待补</span>
+            </div>
+            <p>股票和期权账户合并展示；账户成本仍以截图原值为准，行情价格支持刷新。</p>
+          </div>
+          <div class="portfolio-actions">
+            <button class="ghost-btn" id="portfolioImportBtn">导入持仓</button>
+            <button class="price-refresh-all-btn" id="portfolioRefreshBtn">手动刷新行情</button>
+          </div>
+        </div>
+
+        <div class="portfolio-workspace-bar">
+          <div class="segmented" id="portfolioAccountFilters" role="tablist" aria-label="账户筛选">
+            <button class="selected" data-account-filter="all">全部组合</button>
+            <button data-account-filter="stock">股票账户</button>
+            <button data-account-filter="option">期权账户</button>
+          </div>
+          <div class="segmented portfolio-periods" id="portfolioPeriodFilters" role="tablist" aria-label="收益区间">
+            <button data-period="1m">1月</button>
+            <button class="selected" data-period="3m">3月</button>
+            <button data-period="ytd">今年</button>
+            <button data-period="1y">1年</button>
+            <button data-period="all">全部</button>
+          </div>
+        </div>
+
+        <div class="metric-strip portfolio-metrics" id="portfolioMetrics"></div>
+
+        <div class="portfolio-performance-grid">
+          <section class="panel portfolio-performance-panel">
+            <div class="panel-header compact">
+              <div>
+                <h2>收益表现</h2>
+                <p id="portfolioPerformancePeriod">最近 3 个月 · 账户快照口径</p>
+              </div>
+              <span class="portfolio-quality-badge">历史净值待接入</span>
+            </div>
+            <div class="performance-kpis" id="portfolioPerformanceKpis"></div>
+            <div class="performance-empty" id="portfolioPerformanceEmpty">
+              <strong>暂无可绘制的历史收益曲线</strong>
+              <span>当前快照只能确认未平仓持仓盈亏；导入完整账户历史净值后，才能计算累计收益、波动率、最大回撤并与基准比较。</span>
+            </div>
+          </section>
+          <section class="panel portfolio-contribution-panel">
+            <div class="panel-header compact">
+              <div><h2>持仓贡献</h2><p>按当前持仓盈亏排序</p></div>
+            </div>
+            <div class="portfolio-contribution" id="portfolioContribution"></div>
+          </section>
+        </div>
+
+        <div class="portfolio-layout">
+          <section class="panel portfolio-holdings-panel">
+            <div class="panel-header portfolio-table-header">
+              <div>
+                <h2>账户持仓</h2>
+                <p>数量、成本基数和持仓盈亏采用账户快照口径；不等同于累计投资收益</p>
+              </div>
+              <span class="portfolio-table-scope" id="portfolioTableScope">全部组合</span>
+            </div>
+            <div class="portfolio-table-wrap">
+              <table class="portfolio-table">
+                <colgroup>
+                  <col class="portfolio-col-name" />
+                  <col class="portfolio-col-account" />
+                  <col class="portfolio-col-quantity" />
+                  <col class="portfolio-col-cost" />
+                  <col class="portfolio-col-price" />
+                  <col class="portfolio-col-value" />
+                  <col class="portfolio-col-daily" />
+                  <col class="portfolio-col-profit" />
+                </colgroup>
+                <thead>
+                  <tr>
+                    <th>持仓</th>
+                    <th>账户</th>
+                    <th class="number-cell">数量</th>
+                    <th class="number-cell">成本价</th>
+                    <th class="number-cell">最新价</th>
+                    <th class="number-cell">市值</th>
+                    <th class="number-cell">今日收益</th>
+                    <th class="number-cell">持仓盈亏（快照）</th>
+                  </tr>
+                </thead>
+                <tbody id="portfolioHoldingsBody"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <aside class="portfolio-side-stack">
+            <section class="panel portfolio-allocation-panel">
+              <div class="panel-header compact">
+                <div><h2>账户结构</h2><p>按当前市值计算</p></div>
+              </div>
+              <div id="portfolioAllocation" class="portfolio-allocation"></div>
+            </section>
+            <section class="panel portfolio-risk-panel">
+              <div class="panel-header compact">
+                <div><h2>期权风险</h2><p>基于账户截图可确认字段</p></div>
+              </div>
+              <div class="option-risk-grid" id="portfolioOptionRisk"></div>
+            </section>
+          </aside>
+        </div>
+
+        <section class="portfolio-position-review-section" id="portfolioPositionReviews">
+          <div class="portfolio-section-heading">
+            <div>
+              <span class="section-kicker">PORTFOLIO REVIEW</span>
+              <h2>完整组合复盘</h2>
+              <p>汇总股票与期权的组合结论、仓位和风险边界，不再逐项展示持仓复盘。</p>
+            </div>
+            <span class="analysis-boundary" id="portfolioPositionReviewDate">尚未生成</span>
+          </div>
+          <div class="position-review-summary" id="portfolioPositionReviewSummary"></div>
+        </section>
+
+        <section class="portfolio-option-analysis" id="portfolioOptionAnalysis" hidden>
+        <div class="portfolio-section-heading">
+          <div>
+            <span class="section-kicker">POSITION ANALYSIS</span>
+            <h2>期权持仓分析</h2>
+            <p>仅在期权账户中汇总实时 Greeks、到期风险与压力情景。</p>
+          </div>
+          <span class="analysis-boundary">只读分析 · 非交易指令</span>
+        </div>
+
+        <div class="portfolio-analysis-grid">
+          <section class="panel portfolio-greeks-panel">
+            <div class="panel-header compact">
+              <div><h2>Greeks 与持仓风险汇总</h2><p id="portfolioGreeksStatus">等待期权行情</p></div>
+              <span class="portfolio-quality-badge" id="portfolioGreeksCoverage">0/0 合约</span>
+            </div>
+            <div class="portfolio-greeks-grid" id="portfolioGreeksGrid"></div>
+            <div class="portfolio-risk-notes" id="portfolioRiskNotes"></div>
+          </section>
+
+          <section class="panel portfolio-stress-panel">
+            <div class="panel-header compact portfolio-stress-header">
+              <div><h2>期权组合损益曲线</h2><p>标的价格变动 −30% 至 +30%；Black-Scholes 全量重定价，IV 保持不变</p></div>
+            </div>
+            <div id="portfolioStressResult" class="portfolio-stress-result"></div>
+          </section>
+        </div>
+
+        <div class="portfolio-section-heading option-strategy-heading">
+          <div>
+            <span class="section-kicker">OPTION STRATEGY</span>
+            <h2>期权策略</h2>
+            <p>先识别当前组合形态，再比较与目标匹配的有限风险结构。</p>
+          </div>
+          <span class="analysis-boundary purple">Mira 策略选择层</span>
+        </div>
+
+        <section class="panel portfolio-strategy-panel">
+          <div class="portfolio-strategy-summary" id="portfolioStrategySummary"></div>
+          <div class="portfolio-strategy-grid" id="portfolioStrategyGrid"></div>
+          <div class="portfolio-strategy-footer">
+            <strong>波动率曲面与理论定价</strong>
+            <span id="portfolioPricingStatus">当前使用行情源 IV；独立定价服务尚未接入。</span>
+          </div>
+        </section>
+        </section>
+      </section>
+
+      <section class="view" id="industryView">
+        <div class="industry-grid" id="industryGrid"></div>
+      </section>
+
+      <section class="view" id="targetsView">
+        <section class="panel targets-panel">
+          <div class="panel-header">
+            <div>
+              <h2>标的库</h2>
+              <p>用于快速筛选研究对象、状态、刷新要求和技术标签</p>
+            </div>
+            <div class="segmented" id="targetFilters" role="tablist" aria-label="标的筛选">
+              <button class="selected" data-filter="A股">A 股</button>
+              <button data-filter="港股">港股</button>
+              <button data-filter="美股">美股</button>
+              <button data-filter="大宗商品">大宗商品</button>
+              <button data-filter="ETF">ETF</button>
+            </div>
+          </div>
+          <div class="targets-table-wrap">
+            <table class="targets-table">
+              <thead>
+                <tr>
+                  <th>标的</th>
+                  <th>市场</th>
+                  <th>价格</th>
+                  <th>状态</th>
+                  <th>趋势</th>
+                  <th>刷新</th>
+                </tr>
+              </thead>
+              <tbody id="targetsTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+
+      <section class="view" id="detailView">
+        <div class="detail-layout">
+          <div class="detail-main-stack">
+            <div class="detail-header panel">
+          <div>
+            <button class="back-link" id="backToOverview">← 返回研究总览</button>
+            <div class="object-title-row">
+              <h2>600276.SH 恒瑞医药</h2>
+              <span class="pill blue">working_view</span>
+              <span class="pill amber">watch_only</span>
+              <span class="pill muted">source: eastmoney delayed</span>
+            </div>
+            <p>stale_after: 2026-07-13 · must_refresh_if: close below invalidation_level / FDA policy update</p>
+            <div class="detail-summary-strip" id="detailSummaryStrip">
+              <article><span>核心结论</span><strong>待读取</strong></article>
+            </div>
+            <div class="update-actions">
+              <button class="primary-action" id="priceUpdateBtn">
+                <span class="action-icon line-chart"></span>
+                <span><strong>更新股价行情</strong><em>东方财富优先 · Yahoo 备用</em></span>
+              </button>
+              <button class="primary-action secondary" id="newsUpdateBtn">
+                <span class="action-icon news"></span>
+                <span><strong>更新行业新闻</strong><em>Mira + AI · 基于最新本地 thesis</em></span>
+              </button>
+              <div class="update-status" id="updateStatus" aria-live="polite"></div>
+            </div>
+          </div>
+            </div>
+
+            <section class="panel research-reader">
+            <div class="tabs" id="memoTabs">
+              <button class="active" data-tab="memo">投资备忘录</button>
+              <button data-tab="reports">深度报告</button>
+              <button data-tab="evidence">文件清单</button>
+              <button data-tab="trades">交易日志</button>
+              <button data-tab="objectLibrary">资料库</button>
+            </div>
+            <div class="reader-body" id="readerBody"></div>
+            </section>
+          </div>
+
+          <aside class="right-stack">
+            <section class="panel price-panel">
+              <div class="panel-header">
+                <div>
+                  <h2>行情与 Mira 点位</h2>
+                  <p>market_pricing · quote_time_unavailable · fetched_at 14:10</p>
+                </div>
+                <span class="score">58/100</span>
+              </div>
+              <div class="price-row">
+                <strong>45.86</strong><span class="negative">-1.18%</span>
+              </div>
+              <div class="chart-wrap" aria-label="Mira 技术走势图">
+                <svg viewBox="0 0 560 300" role="img" aria-label="走势图与 Mira 点位">
+                  <defs>
+                    <linearGradient id="area" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0" stop-color="#2f7cf6" stop-opacity="0.16" />
+                      <stop offset="1" stop-color="#2f7cf6" stop-opacity="0" />
+                    </linearGradient>
+                  </defs>
+                  <path class="grid" d="M28 54 H540 M28 112 H540 M28 170 H540 M28 228 H540" />
+                  <path class="area" d="M34 224 C78 206 102 184 142 192 C184 202 205 154 246 166 C292 180 322 118 366 132 C414 148 448 84 520 96 L520 260 L34 260 Z" />
+                  <path class="price-line" d="M34 224 C78 206 102 184 142 192 C184 202 205 154 246 166 C292 180 322 118 366 132 C414 148 448 84 520 96" />
+                  <line class="level override" x1="28" x2="540" y1="108" y2="108" />
+                  <line class="level mira" x1="28" x2="540" y1="142" y2="142" />
+                  <line class="level invalid" x1="28" x2="540" y1="210" y2="210" />
+                  <line class="level auto" x1="28" x2="540" y1="78" y2="78" />
+                  <text x="36" y="98">override 48.20</text>
+                  <text x="36" y="132">trigger_level 47.80</text>
+                  <text x="36" y="200">invalidation_level 42.30</text>
+                  <text x="390" y="70">auto_parse 待确认 51.20</text>
+                </svg>
+              </div>
+              <div class="legend-row">
+                <span><i class="legend override"></i>手动 override</span>
+                <span><i class="legend mira"></i>Mira 技术点位</span>
+                <span><i class="legend auto"></i>自动解析 待确认</span>
+              </div>
+              <div class="technical-note">
+                <strong>trend_state: reversal_attempt</strong>
+                <span>技术提示：反转尝试，仍需价格站稳 trigger_level 并确认量能。</span>
+              </div>
+            </section>
+
+            <section class="panel activity-panel">
+              <div class="panel-header compact">
+                <div><h2>Mira 写入记录</h2><p>更新动作必须留下来源和刷新边界</p></div>
+              </div>
+              <div id="activityLog" class="activity-log"></div>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section class="view" id="libraryView">
+        <div class="library-layout">
+          <section class="panel library-list-panel">
+            <div class="panel-header" style="flex-direction: column; align-items: stretch; gap: 10px;">
+              <div class="segmented" id="libraryCategoryFilters" role="tablist" aria-label="资料库大类" style="width: 100%;">
+                <button class="selected" data-library-category="all">全部</button>
+                <button data-library-category="lessons">经验教训</button>
+                <button data-library-category="industry">行业资料</button>
+                <button data-library-category="methods">方法论</button>
+              </div>
+              <div class="segmented" id="libraryFilters" role="tablist" aria-label="文件类型筛选" style="width: 100%;">
+                <button class="selected" data-library-filter="all">全部</button>
+                <button data-library-filter="md">Markdown</button>
+                <button data-library-filter="pdf">PDF</button>
+                <button data-library-filter="csv">CSV</button>
+              </div>
+            </div>
+            <div class="library-list-shell">
+              <div class="library-list" id="libraryList"></div>
+              <div class="library-scroll-controls" aria-label="资料列表滚动">
+                <button type="button" data-library-scroll="up" title="向上滚动">↑</button>
+                <button type="button" data-library-scroll="down" title="向下滚动">↓</button>
+              </div>
+            </div>
+          </section>
+          <section class="panel document-preview" id="documentPreview"></section>
+        </div>
+      </section>
+
+      <section class="view" id="sourcesView">
+        <div class="source-status-grid" id="sourceStatusGrid"></div>
+      </section>
+
+      <section class="view" id="queueView">
+        <section class="panel queue-panel">
+          <div class="panel-header">
+            <div>
+              <h2>更新队列</h2>
+              <p>按刷新状态、文件新鲜度和研究边界生成待处理清单</p>
+            </div>
+            <span class="pill amber">预览模式</span>
+          </div>
+          <div id="updateQueueList" class="update-queue-list"></div>
+        </section>
+      </section>
+
+      <section class="view" id="settingsView">
+        <div class="settings-grid" id="settingsGrid"></div>
+      </section>
+
+      <section class="view placeholder-view" id="placeholderView">
+        <div class="panel empty-panel">
+          <h2 id="placeholderTitle">模块建设中</h2>
+          <p>当前原型已优先实现研究总览、标的详情页和资料库。其他模块会沿用同一信息架构继续扩展。</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="portfolio-modal-backdrop" id="portfolioImportModal" hidden>
+    <section class="portfolio-import-dialog" role="dialog" aria-modal="true" aria-labelledby="portfolioImportTitle">
+      <div class="portfolio-import-head">
+        <div>
+          <h2 id="portfolioImportTitle">导入东方财富持仓</h2>
+          <p>当前仅支持选择股票或期权账户文件；解析和写入尚未接入。</p>
+        </div>
+        <button class="portfolio-modal-close" id="portfolioImportClose" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="segmented portfolio-import-type" id="portfolioImportType" role="tablist" aria-label="导入账户类型">
+        <button class="selected" data-import-type="stock">股票账户</button>
+        <button data-import-type="option">期权账户</button>
+      </div>
+      <label class="portfolio-file-drop" for="portfolioFileInput">
+        <strong>选择东方财富导出的持仓文件</strong>
+        <span>支持 CSV / XLS / XLSX；文件自动解析将在下一步接入。</span>
+        <input id="portfolioFileInput" type="file" accept=".csv,.xls,.xlsx" />
+        <em id="portfolioFileName">尚未选择文件</em>
+      </label>
+      <div class="portfolio-import-notes">
+        <span>股票字段：证券代码、名称、持仓数量、成本价</span>
+        <span>期权字段：合约代码、方向、持仓张数、成本价</span>
+      </div>
+      <div class="portfolio-import-actions">
+        <button class="ghost-btn" id="portfolioImportCancel" type="button">取消</button>
+        <button class="price-refresh-all-btn" id="portfolioImportPreview" type="button">检查所选文件</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="./option_math.js?v=20260703"></script>
+  <script src="./app.js?v=20260703-activity-scope-v2"></script>
+</body>
+</html>

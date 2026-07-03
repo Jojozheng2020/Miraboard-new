@@ -1,0 +1,12 @@
+node_modules/
+__pycache__/
+*.pyc
+.tmp/
+.tushare-runtime/
+.tmp/
+
+# Local/private portfolio records (never publish)
+data/portfolio-daily-positions.csv
+data/portfolio-daily.csv
+data/portfolio-performance.json
+data/portfolio-transactions.csv

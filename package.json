@@ -1,0 +1,8 @@
+{
+  "name": "miraboard-local-adapters",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "stock-api": "2.7.3"
+  }
+}

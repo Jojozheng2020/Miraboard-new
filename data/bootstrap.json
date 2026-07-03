@@ -1,0 +1,3777 @@
+{
+  "meta": {
+    "source": "static-bootstrap",
+    "generatedAt": "2026-06-25",
+    "miraRoot": "",
+    "notes": "Static bootstrap data for MiraBoard before the read-only API is available.",
+    "researchIndexStatus": "static_snapshot",
+    "researchObjectCount": 21,
+    "industryDocsStatus": "ok",
+    "industryDocsCount": 2,
+    "methodologyDocsStatus": "ok",
+    "methodologyDocsCount": 97
+  },
+  "navItems": [
+    [
+      "overview",
+      "研",
+      "研究总览"
+    ],
+    [
+      "portfolio",
+      "益",
+      "投资收益"
+    ],
+    [
+      "industry",
+      "行",
+      "行业视图"
+    ],
+    [
+      "library",
+      "资",
+      "资料库"
+    ],
+    [
+      "sources",
+      "源",
+      "数据源状态"
+    ],
+    [
+      "queue",
+      "更",
+      "更新队列"
+    ],
+    [
+      "settings",
+      "设",
+      "设置"
+    ]
+  ],
+  "objects": [
+    {
+      "ticker": "000807.SZ",
+      "name": "云铝股份",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/000807.SZ_云铝股份",
+      "fileCount": 7,
+      "latestModifiedAt": 1782271227.7288582,
+      "files": [
+        {
+          "title": "aluminum-price-profit-correlation.csv",
+          "type": "csv",
+          "path": "private/research/000807.SZ_云铝股份/aluminum-price-profit-correlation.csv",
+          "size": 877,
+          "modifiedAt": 1782271227.7274127
+        },
+        {
+          "title": "aluminum-price-profit-correlation.md",
+          "type": "md",
+          "path": "private/research/000807.SZ_云铝股份/aluminum-price-profit-correlation.md",
+          "size": 3996,
+          "modifiedAt": 1782271227.7288582
+        },
+        {
+          "title": "calculation-ledger.csv",
+          "type": "csv",
+          "path": "private/research/000807.SZ_云铝股份/calculation-ledger.csv",
+          "size": 1210,
+          "modifiedAt": 1781526275.422749
+        },
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/000807.SZ_云铝股份/case-notes.md",
+          "size": 2438,
+          "modifiedAt": 1781526275.4237673
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/000807.SZ_云铝股份/evidence-log.csv",
+          "size": 3179,
+          "modifiedAt": 1781526275.422749
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/000807.SZ_云铝股份/investment-memo.md",
+          "size": 10691,
+          "modifiedAt": 1781526275.4222424
+        },
+        {
+          "title": "research-report.html",
+          "type": "html",
+          "path": "private/research/000807.SZ_云铝股份/research-report.html",
+          "size": 7541,
+          "modifiedAt": 1781526275.4267733
+        }
+      ]
+    },
+    {
+      "ticker": "002028.SZ",
+      "name": "思源电气",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "needs_refresh",
+      "color": "amber",
+      "path": "private/research/002028.SZ_思源电气",
+      "fileCount": 5,
+      "latestModifiedAt": 1781669895.8950331,
+      "files": [
+        {
+          "title": "calculation-ledger.csv",
+          "type": "csv",
+          "path": "private/research/002028.SZ_思源电气/calculation-ledger.csv",
+          "size": 1666,
+          "modifiedAt": 1781602344.956967
+        },
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/002028.SZ_思源电气/case-notes.md",
+          "size": 3784,
+          "modifiedAt": 1781602344.9579675
+        },
+        {
+          "title": "event-delta-toshiba-acquisition.md",
+          "type": "md",
+          "path": "private/research/002028.SZ_思源电气/event-delta-toshiba-acquisition.md",
+          "size": 6767,
+          "modifiedAt": 1781669895.8950331
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/002028.SZ_思源电气/evidence-log.csv",
+          "size": 6862,
+          "modifiedAt": 1781602344.9559667
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/002028.SZ_思源电气/investment-memo.md",
+          "size": 11253,
+          "modifiedAt": 1781602344.9559667
+        }
+      ]
+    },
+    {
+      "ticker": "002128.SZ",
+      "name": "电投能源",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "needs_refresh",
+      "color": "amber",
+      "path": "private/research/002128.SZ_电投能源",
+      "fileCount": 12,
+      "latestModifiedAt": 1781579130.7133415,
+      "files": [
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/002128.SZ_电投能源/case-notes.md",
+          "size": 3956,
+          "modifiedAt": 1781154140.3527026
+        },
+        {
+          "title": "diantou-2025-annual-report.pdf",
+          "type": "pdf",
+          "path": "private/research/002128.SZ_电投能源/diantou-2025-annual-report.pdf",
+          "size": 1599089,
+          "modifiedAt": 1781153452.1457999
+        },
+        {
+          "title": "diantou-2025-dividend.pdf",
+          "type": "pdf",
+          "path": "private/research/002128.SZ_电投能源/diantou-2025-dividend.pdf",
+          "size": 166270,
+          "modifiedAt": 1781153450.6756015
+        },
+        {
+          "title": "diantou-2026q1-report.pdf",
+          "type": "pdf",
+          "path": "private/research/002128.SZ_电投能源/diantou-2026q1-report.pdf",
+          "size": 169783,
+          "modifiedAt": 1781153452.4656978
+        },
+        {
+          "title": "diantou-ir-2026-04-28.pdf",
+          "type": "pdf",
+          "path": "private/research/002128.SZ_电投能源/diantou-ir-2026-04-28.pdf",
+          "size": 188338,
+          "modifiedAt": 1781153450.4499738
+        },
+        {
+          "title": "diantou-ir-2026-05-27.pdf",
+          "type": "pdf",
+          "path": "private/research/002128.SZ_电投能源/diantou-ir-2026-05-27.pdf",
+          "size": 163197,
+          "modifiedAt": 1781153454.0115294
+        },
+        {
+          "title": "diantou-reorg-implementation.pdf",
+          "type": "pdf",
+          "path": "private/research/002128.SZ_电投能源/diantou-reorg-implementation.pdf",
+          "size": 1044630,
+          "modifiedAt": 1781153453.4919758
+        },
+        {
+          "title": "diantou-reorg-report-registered.pdf",
+          "type": "pdf",
+          "path": "private/research/002128.SZ_电投能源/diantou-reorg-report-registered.pdf",
+          "size": 3864472,
+          "modifiedAt": 1781153450.2654676
+        },
+        {
+          "title": "diantou-reorg-result-share-change.pdf",
+          "type": "pdf",
+          "path": "private/research/002128.SZ_电投能源/diantou-reorg-result-share-change.pdf",
+          "size": 372954,
+          "modifiedAt": 1781153453.840533
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/002128.SZ_电投能源/evidence-log.csv",
+          "size": 7823,
+          "modifiedAt": 1781579130.7133415
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/002128.SZ_电投能源/investment-memo.md",
+          "size": 15378,
+          "modifiedAt": 1781154140.1309488
+        },
+        {
+          "title": "monitoring-update-2026-06-16.md",
+          "type": "md",
+          "path": "private/research/002128.SZ_电投能源/monitoring-update-2026-06-16.md",
+          "size": 4930,
+          "modifiedAt": 1781579130.712083
+        }
+      ]
+    },
+    {
+      "ticker": "002714.SZ",
+      "name": "牧原股份",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "承接受考验 / 风险降级。单日跌幅较大，需要先观察收盘能否守住短线承接位。",
+      "trendSource": "private/research/002714.SZ_牧原股份/market-update-2026-06-26.md",
+      "trendSourceModifiedAt": 1782462096.110367,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/002714.SZ_牧原股份",
+      "fileCount": 4,
+      "latestModifiedAt": 1782462096.110367,
+      "files": [
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/002714.SZ_牧原股份/case-notes.md",
+          "size": 4156,
+          "modifiedAt": 1781427099.9445193
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/002714.SZ_牧原股份/evidence-log.csv",
+          "size": 5242,
+          "modifiedAt": 1781427099.8400395
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/002714.SZ_牧原股份/investment-memo.md",
+          "size": 8630,
+          "modifiedAt": 1781427099.7491424
+        },
+        {
+          "title": "market-update-2026-06-26.md",
+          "type": "md",
+          "path": "private/research/002714.SZ_牧原股份/market-update-2026-06-26.md",
+          "size": 1269,
+          "modifiedAt": 1782462096.110367
+        }
+      ]
+    },
+    {
+      "ticker": "00700.HK",
+      "name": "腾讯控股",
+      "market": "港股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "needs_refresh",
+      "color": "amber",
+      "path": "private/research/00700.HK_腾讯控股",
+      "fileCount": 3,
+      "latestModifiedAt": 1781504857.6776936,
+      "files": [
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/00700.HK_腾讯控股/case-notes.md",
+          "size": 2323,
+          "modifiedAt": 1781504857.6776936
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/00700.HK_腾讯控股/evidence-log.csv",
+          "size": 5262,
+          "modifiedAt": 1781504857.6766977
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/00700.HK_腾讯控股/investment-memo.md",
+          "size": 11573,
+          "modifiedAt": 1781504857.6776936
+        }
+      ]
+    },
+    {
+      "ticker": "09992.HK",
+      "name": "泡泡玛特",
+      "market": "港股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "needs_refresh",
+      "color": "amber",
+      "path": "private/research/09992.HK_泡泡玛特",
+      "fileCount": 4,
+      "latestModifiedAt": 1781533078.4538367,
+      "files": [
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/09992.HK_泡泡玛特/case-notes.md",
+          "size": 4945,
+          "modifiedAt": 1781533065.797893
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/09992.HK_泡泡玛特/evidence-log.csv",
+          "size": 10855,
+          "modifiedAt": 1781533065.7963953
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/09992.HK_泡泡玛特/investment-memo.md",
+          "size": 17589,
+          "modifiedAt": 1781533078.4538367
+        },
+        {
+          "title": "peer-comparison.csv",
+          "type": "csv",
+          "path": "private/research/09992.HK_泡泡玛特/peer-comparison.csv",
+          "size": 2323,
+          "modifiedAt": 1781533027.7446537
+        }
+      ]
+    },
+    {
+      "ticker": "600096.SH",
+      "name": "云天化",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "承接受考验 / 风险降级。单日跌幅较大，需要先观察收盘能否守住短线承接位。",
+      "trendSource": "private/research/600096.SH_云天化/market-update-2026-06-26.md",
+      "trendSourceModifiedAt": 1782462032.9454334,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/600096.SH_云天化",
+      "fileCount": 9,
+      "latestModifiedAt": 1782462032.9454334,
+      "files": [
+        {
+          "title": "calculation-ledger.csv",
+          "type": "csv",
+          "path": "private/research/600096.SH_云天化/calculation-ledger.csv",
+          "size": 1628,
+          "modifiedAt": 1781495335.3892484
+        },
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/600096.SH_云天化/case-notes.md",
+          "size": 4562,
+          "modifiedAt": 1781495335.3877666
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/600096.SH_云天化/evidence-log.csv",
+          "size": 8585,
+          "modifiedAt": 1781495335.3877666
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/600096.SH_云天化/investment-memo.md",
+          "size": 10518,
+          "modifiedAt": 1781495335.3867698
+        },
+        {
+          "title": "market-update-2026-06-22.md",
+          "type": "md",
+          "path": "private/research/600096.SH_云天化/market-update-2026-06-22.md",
+          "size": 7102,
+          "modifiedAt": 1782107863.513267
+        },
+        {
+          "title": "market-update-2026-06-24.md",
+          "type": "md",
+          "path": "private/research/600096.SH_云天化/market-update-2026-06-24.md",
+          "size": 2848,
+          "modifiedAt": 1782290237.2173347
+        },
+        {
+          "title": "market-update-2026-06-26.md",
+          "type": "md",
+          "path": "private/research/600096.SH_云天化/market-update-2026-06-26.md",
+          "size": 7237,
+          "modifiedAt": 1782462032.9454334
+        },
+        {
+          "title": "validation-variables-2026-06-24.md",
+          "type": "md",
+          "path": "private/research/600096.SH_云天化/validation-variables-2026-06-24.md",
+          "size": 6716,
+          "modifiedAt": 1782294015.3910654
+        },
+        {
+          "title": "yth_spread_sulfur_sensitivity_model.xlsx",
+          "type": "xlsx",
+          "path": "private/research/600096.SH_云天化/yth_spread_sulfur_sensitivity_model.xlsx",
+          "size": 16860,
+          "modifiedAt": 1781501031.5781047
+        }
+      ]
+    },
+    {
+      "ticker": "600276.SH",
+      "name": "恒瑞医药",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/600276.SH_恒瑞医药",
+      "fileCount": 11,
+      "latestModifiedAt": 1782461342.7699034,
+      "files": [
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/600276.SH_恒瑞医药/case-notes.md",
+          "size": 3130,
+          "modifiedAt": 1782461221.6610126
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/600276.SH_恒瑞医药/evidence-log.csv",
+          "size": 9671,
+          "modifiedAt": 1782461342.7699034
+        },
+        {
+          "title": "H3_AP202606221823720809_1国金证券.pdf",
+          "type": "pdf",
+          "path": "private/research/600276.SH_恒瑞医药/H3_AP202606221823720809_1国金证券.pdf",
+          "size": 2835818,
+          "modifiedAt": 1782310271.6384737
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/600276.SH_恒瑞医药/investment-memo.md",
+          "size": 13551,
+          "modifiedAt": 1782461175.7714212
+        },
+        {
+          "title": "monitor-2026-06-23.md",
+          "type": "md",
+          "path": "private/research/600276.SH_恒瑞医药/monitor-2026-06-23.md",
+          "size": 4735,
+          "modifiedAt": 1782242397.804893
+        },
+        {
+          "title": "monitor-2026-06-26.md",
+          "type": "md",
+          "path": "private/research/600276.SH_恒瑞医药/monitor-2026-06-26.md",
+          "size": 4542,
+          "modifiedAt": 1782461207.9368148
+        },
+        {
+          "title": "policy-monitor-2026-06-23.md",
+          "type": "md",
+          "path": "private/research/600276.SH_恒瑞医药/policy-monitor-2026-06-23.md",
+          "size": 5613,
+          "modifiedAt": 1782244532.8320026
+        },
+        {
+          "title": "report-claim-map-国金证券-20260620.csv",
+          "type": "csv",
+          "path": "private/research/600276.SH_恒瑞医药/report-claim-map-国金证券-20260620.csv",
+          "size": 2974,
+          "modifiedAt": 1782310697.1077244
+        },
+        {
+          "title": "report-readout-国金证券-20260620.md",
+          "type": "md",
+          "path": "private/research/600276.SH_恒瑞医药/report-readout-国金证券-20260620.md",
+          "size": 9527,
+          "modifiedAt": 1782310697.1064856
+        },
+        {
+          "title": "research-report.html",
+          "type": "html",
+          "path": "private/research/600276.SH_恒瑞医药/research-report.html",
+          "size": 8163,
+          "modifiedAt": 1781442603.8345003
+        },
+        {
+          "title": "restricted-source-note-国金证券-20260620.md",
+          "type": "md",
+          "path": "private/research/600276.SH_恒瑞医药/restricted-source-note-国金证券-20260620.md",
+          "size": 1473,
+          "modifiedAt": 1782310697.1105254
+        }
+      ]
+    },
+    {
+      "ticker": "600309.SH",
+      "name": "万华化学",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "needs_refresh",
+      "color": "amber",
+      "path": "private/research/600309.SH_万华化学",
+      "fileCount": 4,
+      "latestModifiedAt": 1781533431.3714492,
+      "files": [
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/600309.SH_万华化学/case-notes.md",
+          "size": 3359,
+          "modifiedAt": 1781533431.3714492
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/600309.SH_万华化学/evidence-log.csv",
+          "size": 3530,
+          "modifiedAt": 1781533431.3701096
+        },
+        {
+          "title": "initiation-report.html",
+          "type": "html",
+          "path": "private/research/600309.SH_万华化学/initiation-report.html",
+          "size": 8074,
+          "modifiedAt": 1781533431.3714492
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/600309.SH_万华化学/investment-memo.md",
+          "size": 11228,
+          "modifiedAt": 1781533431.3691182
+        }
+      ]
+    },
+    {
+      "ticker": "600763.SH",
+      "name": "通策医疗",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "needs_refresh",
+      "color": "amber",
+      "path": "private/research/600763.SH_通策医疗",
+      "fileCount": 4,
+      "latestModifiedAt": 1781405905.8187308,
+      "files": [
+        {
+          "title": "calculation-ledger.csv",
+          "type": "csv",
+          "path": "private/research/600763.SH_通策医疗/calculation-ledger.csv",
+          "size": 1496,
+          "modifiedAt": 1781405905.7351873
+        },
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/600763.SH_通策医疗/case-notes.md",
+          "size": 2784,
+          "modifiedAt": 1781405905.64997
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/600763.SH_通策医疗/evidence-log.csv",
+          "size": 6220,
+          "modifiedAt": 1781405905.8187308
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/600763.SH_通策医疗/investment-memo.md",
+          "size": 12449,
+          "modifiedAt": 1781405905.5628264
+        }
+      ]
+    },
+    {
+      "ticker": "600989.SH",
+      "name": "宝丰能源",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/600989.SH_宝丰能源",
+      "fileCount": 5,
+      "latestModifiedAt": 1782218909.5998328,
+      "files": [
+        {
+          "title": "baofeng-2025-annual-report.pdf",
+          "type": "pdf",
+          "path": "private/research/600989.SH_宝丰能源/baofeng-2025-annual-report.pdf",
+          "size": 1670664,
+          "modifiedAt": 1781092733.1592143
+        },
+        {
+          "title": "baofeng-2026q1-report.pdf",
+          "type": "pdf",
+          "path": "private/research/600989.SH_宝丰能源/baofeng-2026q1-report.pdf",
+          "size": 147876,
+          "modifiedAt": 1781092733.3670406
+        },
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/600989.SH_宝丰能源/case-notes.md",
+          "size": 15036,
+          "modifiedAt": 1782218873.0136595
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/600989.SH_宝丰能源/evidence-log.csv",
+          "size": 17976,
+          "modifiedAt": 1782218909.5998328
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/600989.SH_宝丰能源/investment-memo.md",
+          "size": 47133,
+          "modifiedAt": 1782218873.011661
+        }
+      ]
+    },
+    {
+      "ticker": "601872.SH",
+      "name": "招商轮船",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "needs_refresh",
+      "color": "amber",
+      "path": "private/research/601872.SH_招商轮船",
+      "fileCount": 3,
+      "latestModifiedAt": 1781329481.288537,
+      "files": [
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/601872.SH_招商轮船/case-notes.md",
+          "size": 4285,
+          "modifiedAt": 1781329481.288537
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/601872.SH_招商轮船/evidence-log.csv",
+          "size": 5752,
+          "modifiedAt": 1781329460.2811666
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/601872.SH_招商轮船/investment-memo.md",
+          "size": 10511,
+          "modifiedAt": 1781329459.964787
+        }
+      ]
+    },
+    {
+      "ticker": "601898.SH",
+      "name": "中煤能源",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "弱势延续，尚无反转确认",
+      "trendSource": "private/research/601898.SH_中煤能源/market-update-2026-06-26.md",
+      "trendSourceModifiedAt": 1782488044.1703577,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/601898.SH_中煤能源",
+      "fileCount": 12,
+      "latestModifiedAt": 1782488044.1703577,
+      "files": [
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/601898.SH_中煤能源/case-notes.md",
+          "size": 3984,
+          "modifiedAt": 1781145956.2249653
+        },
+        {
+          "title": "china-coal-2025-annual-report.pdf",
+          "type": "pdf",
+          "path": "private/research/601898.SH_中煤能源/china-coal-2025-annual-report.pdf",
+          "size": 1660262,
+          "modifiedAt": 1781145475.0202336
+        },
+        {
+          "title": "china-coal-2026-01-operating-data.pdf",
+          "type": "pdf",
+          "path": "private/research/601898.SH_中煤能源/china-coal-2026-01-operating-data.pdf",
+          "size": 116013,
+          "modifiedAt": 1781145475.94923
+        },
+        {
+          "title": "china-coal-2026-02-operating-data.pdf",
+          "type": "pdf",
+          "path": "private/research/601898.SH_中煤能源/china-coal-2026-02-operating-data.pdf",
+          "size": 117579,
+          "modifiedAt": 1781145473.908401
+        },
+        {
+          "title": "china-coal-2026-03-operating-data.pdf",
+          "type": "pdf",
+          "path": "private/research/601898.SH_中煤能源/china-coal-2026-03-operating-data.pdf",
+          "size": 117418,
+          "modifiedAt": 1781145475.440892
+        },
+        {
+          "title": "china-coal-2026-04-operating-data.pdf",
+          "type": "pdf",
+          "path": "private/research/601898.SH_中煤能源/china-coal-2026-04-operating-data.pdf",
+          "size": 117281,
+          "modifiedAt": 1781145475.6618612
+        },
+        {
+          "title": "china-coal-2026q1-report.pdf",
+          "type": "pdf",
+          "path": "private/research/601898.SH_中煤能源/china-coal-2026q1-report.pdf",
+          "size": 242029,
+          "modifiedAt": 1781145475.226227
+        },
+        {
+          "title": "china-coal-ir-2026-05-15.pdf",
+          "type": "pdf",
+          "path": "private/research/601898.SH_中煤能源/china-coal-ir-2026-05-15.pdf",
+          "size": 152510,
+          "modifiedAt": 1781145475.5502286
+        },
+        {
+          "title": "china-coal-ir-2026-05-20.pdf",
+          "type": "pdf",
+          "path": "private/research/601898.SH_中煤能源/china-coal-ir-2026-05-20.pdf",
+          "size": 159618,
+          "modifiedAt": 1781145475.776467
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/601898.SH_中煤能源/evidence-log.csv",
+          "size": 6317,
+          "modifiedAt": 1781145925.2905369
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/601898.SH_中煤能源/investment-memo.md",
+          "size": 15881,
+          "modifiedAt": 1781145875.3993604
+        },
+        {
+          "title": "market-update-2026-06-26.md",
+          "type": "md",
+          "path": "private/research/601898.SH_中煤能源/market-update-2026-06-26.md",
+          "size": 5606,
+          "modifiedAt": 1782488044.1703577
+        }
+      ]
+    },
+    {
+      "ticker": "688981.SH",
+      "name": "中芯国际",
+      "market": "A股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "needs_refresh",
+      "color": "amber",
+      "path": "private/research/688981.SH_中芯国际",
+      "fileCount": 7,
+      "latestModifiedAt": 1781529294.3418117,
+      "files": [
+        {
+          "title": "calculation-ledger.csv",
+          "type": "csv",
+          "path": "private/research/688981.SH_中芯国际/calculation-ledger.csv",
+          "size": 9017,
+          "modifiedAt": 1781528242.658711
+        },
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/688981.SH_中芯国际/case-notes.md",
+          "size": 4659,
+          "modifiedAt": 1781526985.5494926
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/688981.SH_中芯国际/evidence-log.csv",
+          "size": 12071,
+          "modifiedAt": 1781529294.340299
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/688981.SH_中芯国际/investment-memo.md",
+          "size": 30000,
+          "modifiedAt": 1781529294.340299
+        },
+        {
+          "title": "model-upgrade-map.csv",
+          "type": "csv",
+          "path": "private/research/688981.SH_中芯国际/model-upgrade-map.csv",
+          "size": 5497,
+          "modifiedAt": 1781527922.0970087
+        },
+        {
+          "title": "peer-comparison-tsmc.csv",
+          "type": "csv",
+          "path": "private/research/688981.SH_中芯国际/peer-comparison-tsmc.csv",
+          "size": 2202,
+          "modifiedAt": 1781529294.3418117
+        },
+        {
+          "title": "source-register.csv",
+          "type": "csv",
+          "path": "private/research/688981.SH_中芯国际/source-register.csv",
+          "size": 2350,
+          "modifiedAt": 1781528242.659711
+        }
+      ]
+    },
+    {
+      "ticker": "PLTR.US",
+      "name": "Palantir Technologies",
+      "market": "美股",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/PLTR_PALANTIR",
+      "fileCount": 9,
+      "latestModifiedAt": 1783071728.617837,
+      "files": [
+        {
+          "title": "calculation-ledger.csv",
+          "type": "csv",
+          "path": "private/research/PLTR_PALANTIR/calculation-ledger.csv",
+          "size": 3616,
+          "modifiedAt": 1783071561.3366048
+        },
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/PLTR_PALANTIR/case-notes.md",
+          "size": 3412,
+          "modifiedAt": 1783071231.1004624
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/PLTR_PALANTIR/evidence-log.csv",
+          "size": 9675,
+          "modifiedAt": 1783071561.3410537
+        },
+        {
+          "title": "expectation-map.csv",
+          "type": "csv",
+          "path": "private/research/PLTR_PALANTIR/expectation-map.csv",
+          "size": 1363,
+          "modifiedAt": 1783071231.1024642
+        },
+        {
+          "title": "initiation-report.html",
+          "type": "html",
+          "path": "private/research/PLTR_PALANTIR/initiation-report.html",
+          "size": 18766,
+          "modifiedAt": 1783071728.617837
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/PLTR_PALANTIR/investment-memo.md",
+          "size": 10478,
+          "modifiedAt": 1783071231.0994601
+        },
+        {
+          "title": "source-registry.csv",
+          "type": "csv",
+          "path": "private/research/PLTR_PALANTIR/source-registry.csv",
+          "size": 3071,
+          "modifiedAt": 1783071371.6285462
+        },
+        {
+          "title": "thesis-ledger.md",
+          "type": "md",
+          "path": "private/research/PLTR_PALANTIR/thesis-ledger.md",
+          "size": 2368,
+          "modifiedAt": 1783071231.1014676
+        },
+        {
+          "title": "working-view.md",
+          "type": "md",
+          "path": "private/research/PLTR_PALANTIR/working-view.md",
+          "size": 866,
+          "modifiedAt": 1783071371.6295497
+        }
+      ]
+    },
+    {
+      "ticker": "",
+      "name": "A股铝产业链",
+      "market": "行业分析",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/A股铝产业链",
+      "fileCount": 2,
+      "latestModifiedAt": 1782634563.9230556,
+      "files": [
+        {
+          "title": "A股铝产业链横向研究.md",
+          "type": "md",
+          "path": "private/research/A股铝产业链/A股铝产业链横向研究.md",
+          "size": 16270,
+          "modifiedAt": 1782634563.9230556
+        },
+        {
+          "title": "铝产业链产能库存周期研究.md",
+          "type": "md",
+          "path": "private/research/A股铝产业链/铝产业链产能库存周期研究.md",
+          "size": 13647,
+          "modifiedAt": 1782634563.9230556
+        }
+      ]
+    },
+    {
+      "ticker": "",
+      "name": "化工行业",
+      "market": "行业分析",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/化工行业",
+      "fileCount": 4,
+      "latestModifiedAt": 1782634563.920055,
+      "files": [
+        {
+          "title": "report-claim-map.csv",
+          "type": "csv",
+          "path": "private/research/化工行业/report-claim-map.csv",
+          "size": 4970,
+          "modifiedAt": 1782159574.5230498
+        },
+        {
+          "title": "基础化工2026下半年策略研报解读.md",
+          "type": "md",
+          "path": "private/research/化工行业/基础化工2026下半年策略研报解读.md",
+          "size": 6654,
+          "modifiedAt": 1782159574.5300415
+        },
+        {
+          "title": "用户材料接收记录.md",
+          "type": "md",
+          "path": "private/research/化工行业/用户材料接收记录.md",
+          "size": 1817,
+          "modifiedAt": 1782634563.920055
+        },
+        {
+          "title": "磷化工产能利用率与过剩判断-2026-06-23.md",
+          "type": "md",
+          "path": "private/research/化工行业/磷化工产能利用率与过剩判断-2026-06-23.md",
+          "size": 5065,
+          "modifiedAt": 1782234577.913962
+        }
+      ]
+    },
+    {
+      "ticker": "大宗商品",
+      "name": "煤炭",
+      "market": "大宗商品",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/大宗商品_煤炭",
+      "fileCount": 2,
+      "latestModifiedAt": 1782575654.0911927,
+      "files": [
+        {
+          "title": "commodity-cycle-note.md",
+          "type": "md",
+          "path": "private/research/大宗商品_煤炭/commodity-cycle-note.md",
+          "size": 13433,
+          "modifiedAt": 1782575654.0911927
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/大宗商品_煤炭/evidence-log.csv",
+          "size": 7065,
+          "modifiedAt": 1781496874.9628546
+        }
+      ]
+    },
+    {
+      "ticker": "大宗商品",
+      "name": "石油",
+      "market": "大宗商品",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/大宗商品_石油",
+      "fileCount": 3,
+      "latestModifiedAt": 1782575654.0961957,
+      "files": [
+        {
+          "title": "commodity-cycle-note.md",
+          "type": "md",
+          "path": "private/research/大宗商品_石油/commodity-cycle-note.md",
+          "size": 14217,
+          "modifiedAt": 1782575654.0952013
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/大宗商品_石油/evidence-log.csv",
+          "size": 16295,
+          "modifiedAt": 1781872023.4111893
+        },
+        {
+          "title": "gulf-production-recovery-note.md",
+          "type": "md",
+          "path": "private/research/大宗商品_石油/gulf-production-recovery-note.md",
+          "size": 10077,
+          "modifiedAt": 1782575654.0961957
+        }
+      ]
+    },
+    {
+      "ticker": "大宗商品",
+      "name": "铝",
+      "market": "大宗商品",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/大宗商品_铝",
+      "fileCount": 2,
+      "latestModifiedAt": 1782575844.0201323,
+      "files": [
+        {
+          "title": "commodity-cycle-note.md",
+          "type": "md",
+          "path": "private/research/大宗商品_铝/commodity-cycle-note.md",
+          "size": 10061,
+          "modifiedAt": 1782575844.0201323
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/大宗商品_铝/evidence-log.csv",
+          "size": 4957,
+          "modifiedAt": 1781495278.1865547
+        }
+      ]
+    },
+    {
+      "ticker": "大宗商品",
+      "name": "黄金",
+      "market": "大宗商品",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/大宗商品_黄金",
+      "fileCount": 4,
+      "latestModifiedAt": 1782575654.0941978,
+      "files": [
+        {
+          "title": "case-notes.md",
+          "type": "md",
+          "path": "private/research/大宗商品_黄金/case-notes.md",
+          "size": 1848,
+          "modifiedAt": 1782575654.093198
+        },
+        {
+          "title": "evidence-log.csv",
+          "type": "csv",
+          "path": "private/research/大宗商品_黄金/evidence-log.csv",
+          "size": 5021,
+          "modifiedAt": 1782289618.3974397
+        },
+        {
+          "title": "investment-memo.md",
+          "type": "md",
+          "path": "private/research/大宗商品_黄金/investment-memo.md",
+          "size": 8408,
+          "modifiedAt": 1782575654.093198
+        },
+        {
+          "title": "monitor-update-2026-06-24.md",
+          "type": "md",
+          "path": "private/research/大宗商品_黄金/monitor-update-2026-06-24.md",
+          "size": 3839,
+          "modifiedAt": 1782575654.0941978
+        }
+      ]
+    },
+    {
+      "ticker": "",
+      "name": "行业贝塔反弹",
+      "market": "行业分析",
+      "price": "待接入",
+      "change": "",
+      "trend": "",
+      "trendSource": "",
+      "trendSourceModifiedAt": null,
+      "state": "indexed",
+      "stale": "fresh",
+      "color": "green",
+      "path": "private/research/行业贝塔反弹",
+      "fileCount": 2,
+      "latestModifiedAt": 1782634563.9020565,
+      "files": [
+        {
+          "title": "search-review-log.csv",
+          "type": "csv",
+          "path": "private/research/行业贝塔反弹/search-review-log.csv",
+          "size": 1341,
+          "modifiedAt": 1782244175.7594638
+        },
+        {
+          "title": "行业贝塔反弹方法卡.md",
+          "type": "md",
+          "path": "private/research/行业贝塔反弹/行业贝塔反弹方法卡.md",
+          "size": 9257,
+          "modifiedAt": 1782634563.9020565
+        }
+      ]
+    }
+  ],
+  "libraryDocs": [
+    {
+      "id": "lesson-1",
+      "title": "错误案例：2024年追高半导体ETF",
+      "type": "教训 / Markdown",
+      "path": "lessons/lesson-001.md",
+      "tags": [
+        "教训",
+        "半导体",
+        "择时"
+      ],
+      "summary": "在市场情绪过热时追涨，未等到技术确认信号，导致买入后回调20%的教训。",
+      "outline": [
+        "事件背景",
+        "错误分析",
+        "改进措施"
+      ],
+      "category": "lessons"
+    },
+    {
+      "id": "lesson-2",
+      "title": "教训：忽视行业政策变化的预警",
+      "type": "教训 / Markdown",
+      "path": "lessons/lesson-002.md",
+      "tags": [
+        "教训",
+        "政策",
+        "医药"
+      ],
+      "summary": "某医药股在集采政策出台前已有信号，但研究时未将政策变量纳入must_refresh_if。",
+      "outline": [
+        "政策信号识别",
+        "刷新边界设计缺陷",
+        "后续改进"
+      ],
+      "category": "lessons"
+    },
+    {
+      "id": "book-options",
+      "title": "期权投资策略（原书第5版）",
+      "type": "书籍 / PDF",
+      "path": "Mira/期权投资策略（原书第5版）.pdf",
+      "tags": [
+        "期权",
+        "风险管理",
+        "策略"
+      ],
+      "summary": "用于 instrument strategy gate 的背景阅读。资料库只做预览和索引，不把书籍内容写入 Mira 结论。",
+      "outline": [
+        "第 1 部分：期权基础与价格行为",
+        "第 2 部分：波动率、希腊字母与风险",
+        "第 3 部分：组合策略与情境使用"
+      ],
+      "category": "industry"
+    },
+    {
+      "id": "pharma-policy",
+      "title": "创新药政策与 FDA 风险观察",
+      "type": "行业资料 / Markdown",
+      "path": "private/research/600276.SH_恒瑞医药/policy-monitor-2026-06-23.md",
+      "tags": [
+        "医药",
+        "政策",
+        "恒瑞"
+      ],
+      "summary": "记录政策信号、法律效力、公司 thesis 风险映射；可在恒瑞详情页作为相关资料显示。",
+      "outline": [
+        "政策事件时间线",
+        "对出海管线和 FDA 审批节奏的影响",
+        "must_refresh_if 与证据缺口"
+      ],
+      "category": "industry"
+    },
+    {
+      "id": "aluminum-chain",
+      "title": "大宗商品_铝深度研究报告",
+      "type": "行业资料 / Markdown",
+      "path": "private/research/大宗商品_铝/commodity-cycle-note.md",
+      "tags": [
+        "大宗商品",
+        "有色",
+        "铝",
+        "周期"
+      ],
+      "summary": "用于云铝股份和铝产业链对象的上游资料预览，关注价格、成本、供给约束与利润传导。",
+      "outline": [
+        "铝价与利润传导",
+        "供给约束与水电铝成本",
+        "A 股链条映射"
+      ],
+      "category": "industry"
+    },
+    {
+      "id": "coal-dashboard",
+      "title": "大宗商品_煤炭周期研究报告",
+      "type": "行业资料 / CSV + MD",
+      "path": "private/research/大宗商品_煤炭/commodity-cycle-note.md",
+      "tags": [
+        "大宗商品",
+        "煤炭",
+        "周期",
+        "利润"
+      ],
+      "summary": "聚合煤炭行业利润、价格和政策变量，适合连接中煤能源、宝丰能源等对象。",
+      "outline": [
+        "2022 高利润来源",
+        "价格-成本-政策三变量",
+        "行业 beta 监控项"
+      ],
+      "category": "industry"
+    },
+    {
+      "id": "method-memory-methodologies-adopted-md",
+      "title": "adopted.md",
+      "type": "md",
+      "path": "memory/methodologies/adopted.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/adopted.md",
+      "category": "methods",
+      "size": 603,
+      "modifiedAt": 1781016448.1474257
+    },
+    {
+      "id": "method-memory-methodologies-analysis-routing-md",
+      "title": "analysis-routing.md",
+      "type": "md",
+      "path": "memory/methodologies/analysis-routing.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/analysis-routing.md",
+      "category": "methods",
+      "size": 6468,
+      "modifiedAt": 1781016448.1484249
+    },
+    {
+      "id": "method-memory-methodologies-autoresearch-agent-loop-md",
+      "title": "autoresearch-agent-loop.md",
+      "type": "md",
+      "path": "memory/methodologies/autoresearch-agent-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/autoresearch-agent-loop.md",
+      "category": "methods",
+      "size": 10333,
+      "modifiedAt": 1781016448.1504264
+    },
+    {
+      "id": "method-memory-methodologies-channel-check-scuttlebutt-md",
+      "title": "channel-check-scuttlebutt.md",
+      "type": "md",
+      "path": "memory/methodologies/channel-check-scuttlebutt.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/channel-check-scuttlebutt.md",
+      "category": "methods",
+      "size": 8116,
+      "modifiedAt": 1781016448.1514268
+    },
+    {
+      "id": "method-memory-methodologies-commodity-cycle-analysis-md",
+      "title": "commodity-cycle-analysis.md",
+      "type": "md",
+      "path": "memory/methodologies/commodity-cycle-analysis.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/commodity-cycle-analysis.md",
+      "category": "methods",
+      "size": 7796,
+      "modifiedAt": 1781016448.1537263
+    },
+    {
+      "id": "method-memory-methodologies-etf-listing-analysis-md",
+      "title": "etf-listing-analysis.md",
+      "type": "md",
+      "path": "memory/methodologies/etf-listing-analysis.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/etf-listing-analysis.md",
+      "category": "methods",
+      "size": 9463,
+      "modifiedAt": 1781016448.1547246
+    },
+    {
+      "id": "method-memory-methodologies-etf-listing-discovery-md",
+      "title": "etf-listing-discovery.md",
+      "type": "md",
+      "path": "memory/methodologies/etf-listing-discovery.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/etf-listing-discovery.md",
+      "category": "methods",
+      "size": 3852,
+      "modifiedAt": 1781016448.1547246
+    },
+    {
+      "id": "method-memory-methodologies-flow-intent-inference-md",
+      "title": "flow-intent-inference.md",
+      "type": "md",
+      "path": "memory/methodologies/flow-intent-inference.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/flow-intent-inference.md",
+      "category": "methods",
+      "size": 13640,
+      "modifiedAt": 1781016448.1567302
+    },
+    {
+      "id": "method-memory-methodologies-industry-concept-analysis-md",
+      "title": "industry-concept-analysis.md",
+      "type": "md",
+      "path": "memory/methodologies/industry-concept-analysis.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/industry-concept-analysis.md",
+      "category": "methods",
+      "size": 3714,
+      "modifiedAt": 1781016448.1577258
+    },
+    {
+      "id": "method-memory-methodologies-institutional-research-quality-gate-md",
+      "title": "institutional-research-quality-gate.md",
+      "type": "md",
+      "path": "memory/methodologies/institutional-research-quality-gate.md",
+      "tags": [
+        "方法论",
+        "风控边界"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/institutional-research-quality-gate.md",
+      "category": "methods",
+      "size": 7418,
+      "modifiedAt": 1781016448.158728
+    },
+    {
+      "id": "method-memory-methodologies-institutional-thesis-system-md",
+      "title": "institutional-thesis-system.md",
+      "type": "md",
+      "path": "memory/methodologies/institutional-thesis-system.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/institutional-thesis-system.md",
+      "category": "methods",
+      "size": 6084,
+      "modifiedAt": 1781016448.1599138
+    },
+    {
+      "id": "method-memory-methodologies-llm-claim-classification-md",
+      "title": "llm-claim-classification.md",
+      "type": "md",
+      "path": "memory/methodologies/llm-claim-classification.md",
+      "tags": [
+        "方法论",
+        "证据链"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/llm-claim-classification.md",
+      "category": "methods",
+      "size": 6573,
+      "modifiedAt": 1781016448.1619296
+    },
+    {
+      "id": "method-memory-methodologies-long-term-multibagger-research-md",
+      "title": "long-term-multibagger-research.md",
+      "type": "md",
+      "path": "memory/methodologies/long-term-multibagger-research.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/long-term-multibagger-research.md",
+      "category": "methods",
+      "size": 16232,
+      "modifiedAt": 1781016448.1629312
+    },
+    {
+      "id": "method-memory-methodologies-macro-data-release-triage-md",
+      "title": "macro-data-release-triage.md",
+      "type": "md",
+      "path": "memory/methodologies/macro-data-release-triage.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/macro-data-release-triage.md",
+      "category": "methods",
+      "size": 10370,
+      "modifiedAt": 1781016448.1659384
+    },
+    {
+      "id": "method-memory-methodologies-macro-regime-analysis-md",
+      "title": "macro-regime-analysis.md",
+      "type": "md",
+      "path": "memory/methodologies/macro-regime-analysis.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/macro-regime-analysis.md",
+      "category": "methods",
+      "size": 10712,
+      "modifiedAt": 1781016448.1669893
+    },
+    {
+      "id": "method-memory-methodologies-market-structure-policy-md",
+      "title": "market-structure-policy.md",
+      "type": "md",
+      "path": "memory/methodologies/market-structure-policy.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/market-structure-policy.md",
+      "category": "methods",
+      "size": 10063,
+      "modifiedAt": 1781016448.1690037
+    },
+    {
+      "id": "method-memory-methodologies-options-flow-analysis-md",
+      "title": "options-flow-analysis.md",
+      "type": "md",
+      "path": "memory/methodologies/options-flow-analysis.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/options-flow-analysis.md",
+      "category": "methods",
+      "size": 15435,
+      "modifiedAt": 1781016448.1710029
+    },
+    {
+      "id": "method-memory-methodologies-retired-md",
+      "title": "retired.md",
+      "type": "md",
+      "path": "memory/methodologies/retired.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/retired.md",
+      "category": "methods",
+      "size": 260,
+      "modifiedAt": 1781016448.172003
+    },
+    {
+      "id": "method-memory-methodologies-roadmap-to-bottleneck-recursion-md",
+      "title": "roadmap-to-bottleneck-recursion.md",
+      "type": "md",
+      "path": "memory/methodologies/roadmap-to-bottleneck-recursion.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/roadmap-to-bottleneck-recursion.md",
+      "category": "methods",
+      "size": 14967,
+      "modifiedAt": 1781016448.1750033
+    },
+    {
+      "id": "method-memory-methodologies-technical-market-pricing-context-md",
+      "title": "technical-market-pricing-context.md",
+      "type": "md",
+      "path": "memory/methodologies/technical-market-pricing-context.md",
+      "tags": [
+        "方法论",
+        "技术分析"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/technical-market-pricing-context.md",
+      "category": "methods",
+      "size": 14723,
+      "modifiedAt": 1781315258.0163085
+    },
+    {
+      "id": "method-memory-methodologies-thesis-horizon-routing-md",
+      "title": "thesis-horizon-routing.md",
+      "type": "md",
+      "path": "memory/methodologies/thesis-horizon-routing.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/thesis-horizon-routing.md",
+      "category": "methods",
+      "size": 7147,
+      "modifiedAt": 1781016448.178007
+    },
+    {
+      "id": "method-memory-methodologies-todo-md",
+      "title": "todo.md",
+      "type": "md",
+      "path": "memory/methodologies/todo.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/todo.md",
+      "category": "methods",
+      "size": 781,
+      "modifiedAt": 1781016448.179271
+    },
+    {
+      "id": "method-memory-methodologies-top-bottom-risk-overlay-md",
+      "title": "top-bottom-risk-overlay.md",
+      "type": "md",
+      "path": "memory/methodologies/top-bottom-risk-overlay.md",
+      "tags": [
+        "方法论",
+        "风控边界"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/top-bottom-risk-overlay.md",
+      "category": "methods",
+      "size": 13739,
+      "modifiedAt": 1781016448.1814666
+    },
+    {
+      "id": "method-memory-methodologies-trial-md",
+      "title": "trial.md",
+      "type": "md",
+      "path": "memory/methodologies/trial.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/trial.md",
+      "category": "methods",
+      "size": 15602,
+      "modifiedAt": 1781016448.1824822
+    },
+    {
+      "id": "method-memory-methodologies-variant-perception-trial-2026-04-md",
+      "title": "variant-perception-trial-2026-04.md",
+      "type": "md",
+      "path": "memory/methodologies/variant-perception-trial-2026-04.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/variant-perception-trial-2026-04.md",
+      "category": "methods",
+      "size": 5943,
+      "modifiedAt": 1781016448.1834822
+    },
+    {
+      "id": "method-memory-methodologies-variant-perception-md",
+      "title": "variant-perception.md",
+      "type": "md",
+      "path": "memory/methodologies/variant-perception.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：memory/methodologies/variant-perception.md",
+      "category": "methods",
+      "size": 7971,
+      "modifiedAt": 1781016448.1849766
+    },
+    {
+      "id": "method-loops-analysis-routing-md",
+      "title": "analysis-routing.md",
+      "type": "md",
+      "path": "loops/analysis-routing.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/analysis-routing.md",
+      "category": "methods",
+      "size": 2650,
+      "modifiedAt": 1782379697.3040998
+    },
+    {
+      "id": "method-loops-decision-quality-review-loop-md",
+      "title": "decision-quality-review-loop.md",
+      "type": "md",
+      "path": "loops/decision-quality-review-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/decision-quality-review-loop.md",
+      "category": "methods",
+      "size": 2978,
+      "modifiedAt": 1781016448.1350477
+    },
+    {
+      "id": "method-loops-depth-budget-md",
+      "title": "depth-budget.md",
+      "type": "md",
+      "path": "loops/depth-budget.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/depth-budget.md",
+      "category": "methods",
+      "size": 13229,
+      "modifiedAt": 1782379697.3030875
+    },
+    {
+      "id": "method-loops-event-delta-loop-md",
+      "title": "event-delta-loop.md",
+      "type": "md",
+      "path": "loops/event-delta-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/event-delta-loop.md",
+      "category": "methods",
+      "size": 2350,
+      "modifiedAt": 1781016448.1364095
+    },
+    {
+      "id": "method-loops-follow-up-gate-md",
+      "title": "follow-up-gate.md",
+      "type": "md",
+      "path": "loops/follow-up-gate.md",
+      "tags": [
+        "方法论",
+        "研究流程",
+        "风控边界"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/follow-up-gate.md",
+      "category": "methods",
+      "size": 10876,
+      "modifiedAt": 1782379697.3030875
+    },
+    {
+      "id": "method-loops-intent-intake-md",
+      "title": "intent-intake.md",
+      "type": "md",
+      "path": "loops/intent-intake.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/intent-intake.md",
+      "category": "methods",
+      "size": 25815,
+      "modifiedAt": 1782379697.302091
+    },
+    {
+      "id": "method-loops-long-term-thesis-loop-md",
+      "title": "long-term-thesis-loop.md",
+      "type": "md",
+      "path": "loops/long-term-thesis-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/long-term-thesis-loop.md",
+      "category": "methods",
+      "size": 9242,
+      "modifiedAt": 1782381990.9003193
+    },
+    {
+      "id": "method-loops-methodology-research-loop-md",
+      "title": "methodology-research-loop.md",
+      "type": "md",
+      "path": "loops/methodology-research-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/methodology-research-loop.md",
+      "category": "methods",
+      "size": 5988,
+      "modifiedAt": 1781016448.1384315
+    },
+    {
+      "id": "method-loops-monitoring-loop-md",
+      "title": "monitoring-loop.md",
+      "type": "md",
+      "path": "loops/monitoring-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/monitoring-loop.md",
+      "category": "methods",
+      "size": 4762,
+      "modifiedAt": 1781016448.1394238
+    },
+    {
+      "id": "method-loops-output-package-routing-md",
+      "title": "output-package-routing.md",
+      "type": "md",
+      "path": "loops/output-package-routing.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/output-package-routing.md",
+      "category": "methods",
+      "size": 3823,
+      "modifiedAt": 1782379697.3030875
+    },
+    {
+      "id": "method-loops-portfolio-construction-review-loop-md",
+      "title": "portfolio-construction-review-loop.md",
+      "type": "md",
+      "path": "loops/portfolio-construction-review-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/portfolio-construction-review-loop.md",
+      "category": "methods",
+      "size": 3696,
+      "modifiedAt": 1781016448.1404276
+    },
+    {
+      "id": "method-loops-portfolio-review-loop-md",
+      "title": "portfolio-review-loop.md",
+      "type": "md",
+      "path": "loops/portfolio-review-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/portfolio-review-loop.md",
+      "category": "methods",
+      "size": 4597,
+      "modifiedAt": 1781016448.1404276
+    },
+    {
+      "id": "method-loops-position-review-loop-md",
+      "title": "position-review-loop.md",
+      "type": "md",
+      "path": "loops/position-review-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/position-review-loop.md",
+      "category": "methods",
+      "size": 4747,
+      "modifiedAt": 1781016448.1414244
+    },
+    {
+      "id": "method-loops-research-loop-md",
+      "title": "research-loop.md",
+      "type": "md",
+      "path": "loops/research-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/research-loop.md",
+      "category": "methods",
+      "size": 11654,
+      "modifiedAt": 1781016448.142425
+    },
+    {
+      "id": "method-loops-routing-stop-rules-md",
+      "title": "routing-stop-rules.md",
+      "type": "md",
+      "path": "loops/routing-stop-rules.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/routing-stop-rules.md",
+      "category": "methods",
+      "size": 2342,
+      "modifiedAt": 1782379697.3040998
+    },
+    {
+      "id": "method-loops-single-equity-routing-md",
+      "title": "single-equity-routing.md",
+      "type": "md",
+      "path": "loops/single-equity-routing.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/single-equity-routing.md",
+      "category": "methods",
+      "size": 2475,
+      "modifiedAt": 1782379697.3030875
+    },
+    {
+      "id": "method-loops-thesis-update-loop-md",
+      "title": "thesis-update-loop.md",
+      "type": "md",
+      "path": "loops/thesis-update-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/thesis-update-loop.md",
+      "category": "methods",
+      "size": 2942,
+      "modifiedAt": 1781016448.142425
+    },
+    {
+      "id": "method-loops-view-continuity-loop-md",
+      "title": "view-continuity-loop.md",
+      "type": "md",
+      "path": "loops/view-continuity-loop.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：loops/view-continuity-loop.md",
+      "category": "methods",
+      "size": 4839,
+      "modifiedAt": 1781016448.1444304
+    },
+    {
+      "id": "method-templates-actionability-system-actionability-bridge-md",
+      "title": "actionability-bridge.md",
+      "type": "md",
+      "path": "templates/actionability-system/actionability-bridge.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/actionability-system/actionability-bridge.md",
+      "category": "methods",
+      "size": 3335,
+      "modifiedAt": 1781531965.538106
+    },
+    {
+      "id": "method-templates-actionability-system-instrument-strategy-gate-md",
+      "title": "instrument-strategy-gate.md",
+      "type": "md",
+      "path": "templates/actionability-system/instrument-strategy-gate.md",
+      "tags": [
+        "方法论",
+        "技术分析",
+        "模板",
+        "风控边界"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/actionability-system/instrument-strategy-gate.md",
+      "category": "methods",
+      "size": 1529,
+      "modifiedAt": 1781016448.3054607
+    },
+    {
+      "id": "method-templates-commodity-analysis-package-commodity-cycle-note-md",
+      "title": "commodity-cycle-note.md",
+      "type": "md",
+      "path": "templates/commodity-analysis-package/commodity-cycle-note.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/commodity-analysis-package/commodity-cycle-note.md",
+      "category": "methods",
+      "size": 1342,
+      "modifiedAt": 1781016448.3084614
+    },
+    {
+      "id": "method-templates-data-requirement-brief-md",
+      "title": "data-requirement-brief.md",
+      "type": "md",
+      "path": "templates/data-requirement-brief.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/data-requirement-brief.md",
+      "category": "methods",
+      "size": 1638,
+      "modifiedAt": 1781016448.3117006
+    },
+    {
+      "id": "method-templates-delivery-checklist-md",
+      "title": "delivery-checklist.md",
+      "type": "md",
+      "path": "templates/delivery-checklist.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/delivery-checklist.md",
+      "category": "methods",
+      "size": 7310,
+      "modifiedAt": 1781531965.5401003
+    },
+    {
+      "id": "method-templates-earnings-analysis-package-earnings-analysis-md",
+      "title": "earnings-analysis.md",
+      "type": "md",
+      "path": "templates/earnings-analysis-package/earnings-analysis.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/earnings-analysis-package/earnings-analysis.md",
+      "category": "methods",
+      "size": 4678,
+      "modifiedAt": 1781016448.3146994
+    },
+    {
+      "id": "method-templates-etf-listing-analysis-package-etf-listing-analysis-md",
+      "title": "etf-listing-analysis.md",
+      "type": "md",
+      "path": "templates/etf-listing-analysis-package/etf-listing-analysis.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/etf-listing-analysis-package/etf-listing-analysis.md",
+      "category": "methods",
+      "size": 2788,
+      "modifiedAt": 1781016448.3176947
+    },
+    {
+      "id": "method-templates-etf-listing-discovery-package-discovery-log-md",
+      "title": "discovery-log.md",
+      "type": "md",
+      "path": "templates/etf-listing-discovery-package/discovery-log.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/etf-listing-discovery-package/discovery-log.md",
+      "category": "methods",
+      "size": 768,
+      "modifiedAt": 1781016448.3201957
+    },
+    {
+      "id": "method-templates-follow-through-refresh-md",
+      "title": "follow-through-refresh.md",
+      "type": "md",
+      "path": "templates/follow-through-refresh.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/follow-through-refresh.md",
+      "category": "methods",
+      "size": 1611,
+      "modifiedAt": 1781016448.322543
+    },
+    {
+      "id": "method-templates-industry-analysis-package-industry-map-md",
+      "title": "industry-map.md",
+      "type": "md",
+      "path": "templates/industry-analysis-package/industry-map.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/industry-analysis-package/industry-map.md",
+      "category": "methods",
+      "size": 2055,
+      "modifiedAt": 1781016448.337997
+    },
+    {
+      "id": "method-templates-ingestion-layer-restricted-source-note-md",
+      "title": "restricted-source-note.md",
+      "type": "md",
+      "path": "templates/ingestion-layer/restricted-source-note.md",
+      "tags": [
+        "方法论",
+        "证据链",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/ingestion-layer/restricted-source-note.md",
+      "category": "methods",
+      "size": 1588,
+      "modifiedAt": 1781016448.347785
+    },
+    {
+      "id": "method-templates-ingestion-layer-user-material-intake-md",
+      "title": "user-material-intake.md",
+      "type": "md",
+      "path": "templates/ingestion-layer/user-material-intake.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/ingestion-layer/user-material-intake.md",
+      "category": "methods",
+      "size": 1813,
+      "modifiedAt": 1781016448.3487823
+    },
+    {
+      "id": "method-templates-long-term-multibagger-checklist-md",
+      "title": "long-term-multibagger-checklist.md",
+      "type": "md",
+      "path": "templates/long-term-multibagger-checklist.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/long-term-multibagger-checklist.md",
+      "category": "methods",
+      "size": 3547,
+      "modifiedAt": 1781016448.35108
+    },
+    {
+      "id": "method-templates-methodology-card-md",
+      "title": "methodology-card.md",
+      "type": "md",
+      "path": "templates/methodology-card.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/methodology-card.md",
+      "category": "methods",
+      "size": 1387,
+      "modifiedAt": 1781016448.3520935
+    },
+    {
+      "id": "method-templates-outcome-review-decision-quality-review-md",
+      "title": "decision-quality-review.md",
+      "type": "md",
+      "path": "templates/outcome-review/decision-quality-review.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/outcome-review/decision-quality-review.md",
+      "category": "methods",
+      "size": 2242,
+      "modifiedAt": 1781016448.3580923
+    },
+    {
+      "id": "method-templates-portfolio-system-portfolio-construction-review-md",
+      "title": "portfolio-construction-review.md",
+      "type": "md",
+      "path": "templates/portfolio-system/portfolio-construction-review.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/portfolio-system/portfolio-construction-review.md",
+      "category": "methods",
+      "size": 942,
+      "modifiedAt": 1781016448.3629744
+    },
+    {
+      "id": "method-templates-portfolio-system-position-review-md",
+      "title": "position-review.md",
+      "type": "md",
+      "path": "templates/portfolio-system/position-review.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/portfolio-system/position-review.md",
+      "category": "methods",
+      "size": 1474,
+      "modifiedAt": 1781016448.364989
+    },
+    {
+      "id": "method-templates-private-state-working-view-md",
+      "title": "working-view.md",
+      "type": "md",
+      "path": "templates/private-state/working-view.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/private-state/working-view.md",
+      "category": "methods",
+      "size": 387,
+      "modifiedAt": 1781016448.3680084
+    },
+    {
+      "id": "method-templates-research-package-case-notes-md",
+      "title": "case-notes.md",
+      "type": "md",
+      "path": "templates/research-package/case-notes.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/research-package/case-notes.md",
+      "category": "methods",
+      "size": 1226,
+      "modifiedAt": 1781016448.3712165
+    },
+    {
+      "id": "method-templates-research-package-investment-memo-md",
+      "title": "investment-memo.md",
+      "type": "md",
+      "path": "templates/research-package/investment-memo.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/research-package/investment-memo.md",
+      "category": "methods",
+      "size": 3988,
+      "modifiedAt": 1781016448.3722322
+    },
+    {
+      "id": "method-templates-research-report-interpretation-package-report-readout-md",
+      "title": "report-readout.md",
+      "type": "md",
+      "path": "templates/research-report-interpretation-package/report-readout.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/research-report-interpretation-package/report-readout.md",
+      "category": "methods",
+      "size": 2549,
+      "modifiedAt": 1781016448.3752325
+    },
+    {
+      "id": "method-templates-sec-filing-analysis-package-filing-analysis-md",
+      "title": "filing-analysis.md",
+      "type": "md",
+      "path": "templates/sec-filing-analysis-package/filing-analysis.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/sec-filing-analysis-package/filing-analysis.md",
+      "category": "methods",
+      "size": 2551,
+      "modifiedAt": 1781016448.3802373
+    },
+    {
+      "id": "method-templates-source-gap-refresh-md",
+      "title": "source-gap-refresh.md",
+      "type": "md",
+      "path": "templates/source-gap-refresh.md",
+      "tags": [
+        "方法论",
+        "证据链",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/source-gap-refresh.md",
+      "category": "methods",
+      "size": 1028,
+      "modifiedAt": 1781016448.382763
+    },
+    {
+      "id": "method-templates-thesis-system-event-delta-md",
+      "title": "event-delta.md",
+      "type": "md",
+      "path": "templates/thesis-system/event-delta.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/thesis-system/event-delta.md",
+      "category": "methods",
+      "size": 838,
+      "modifiedAt": 1781016448.3865237
+    },
+    {
+      "id": "method-templates-thesis-system-postmortem-md",
+      "title": "postmortem.md",
+      "type": "md",
+      "path": "templates/thesis-system/postmortem.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/thesis-system/postmortem.md",
+      "category": "methods",
+      "size": 568,
+      "modifiedAt": 1781016448.387544
+    },
+    {
+      "id": "method-templates-thesis-system-thesis-ledger-md",
+      "title": "thesis-ledger.md",
+      "type": "md",
+      "path": "templates/thesis-system/thesis-ledger.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/thesis-system/thesis-ledger.md",
+      "category": "methods",
+      "size": 1065,
+      "modifiedAt": 1781016448.3885388
+    },
+    {
+      "id": "method-templates-variant-perception-checklist-md",
+      "title": "variant-perception-checklist.md",
+      "type": "md",
+      "path": "templates/variant-perception-checklist.md",
+      "tags": [
+        "方法论",
+        "模板"
+      ],
+      "summary": "来自 Mira 方法论目录：templates/variant-perception-checklist.md",
+      "category": "methods",
+      "size": 2048,
+      "modifiedAt": 1781016448.389959
+    },
+    {
+      "id": "method-docs-chatgpt-conversation-instructions-md",
+      "title": "chatgpt-conversation-instructions.md",
+      "type": "md",
+      "path": "docs/chatgpt-conversation-instructions.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：docs/chatgpt-conversation-instructions.md",
+      "category": "methods",
+      "size": 6601,
+      "modifiedAt": 1781016448.1063638
+    },
+    {
+      "id": "method-docs-i18n-plan-md",
+      "title": "i18n-plan.md",
+      "type": "md",
+      "path": "docs/i18n-plan.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：docs/i18n-plan.md",
+      "category": "methods",
+      "size": 17636,
+      "modifiedAt": 1781016448.1073775
+    },
+    {
+      "id": "method-docs-mira-research-workflow-md",
+      "title": "mira-research-workflow.md",
+      "type": "md",
+      "path": "docs/mira-research-workflow.md",
+      "tags": [
+        "方法论",
+        "研究流程"
+      ],
+      "summary": "来自 Mira 方法论目录：docs/mira-research-workflow.md",
+      "category": "methods",
+      "size": 4448,
+      "modifiedAt": 1781329146.490544
+    },
+    {
+      "id": "method-docs-module-map-md",
+      "title": "module-map.md",
+      "type": "md",
+      "path": "docs/module-map.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：docs/module-map.md",
+      "category": "methods",
+      "size": 9734,
+      "modifiedAt": 1781016448.1073775
+    },
+    {
+      "id": "method-docs-research-artifacts-md",
+      "title": "research-artifacts.md",
+      "type": "md",
+      "path": "docs/research-artifacts.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：docs/research-artifacts.md",
+      "category": "methods",
+      "size": 9690,
+      "modifiedAt": 1781016448.1083791
+    },
+    {
+      "id": "method-architecture-data-acquisition-upgrade-md",
+      "title": "data-acquisition-upgrade.md",
+      "type": "md",
+      "path": "architecture/data-acquisition-upgrade.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：architecture/data-acquisition-upgrade.md",
+      "category": "methods",
+      "size": 19318,
+      "modifiedAt": 1781016447.8441849
+    },
+    {
+      "id": "method-architecture-thesis-system-md",
+      "title": "thesis-system.md",
+      "type": "md",
+      "path": "architecture/thesis-system.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：architecture/thesis-system.md",
+      "category": "methods",
+      "size": 6859,
+      "modifiedAt": 1781016447.8457868
+    },
+    {
+      "id": "method-data-actionability-risk-control-md",
+      "title": "actionability-risk-control.md",
+      "type": "md",
+      "path": "data/actionability-risk-control.md",
+      "tags": [
+        "方法论",
+        "风控边界"
+      ],
+      "summary": "来自 Mira 方法论目录：data/actionability-risk-control.md",
+      "category": "methods",
+      "size": 6128,
+      "modifiedAt": 1781531965.5357802
+    },
+    {
+      "id": "method-data-claim-taxonomy-md",
+      "title": "claim-taxonomy.md",
+      "type": "md",
+      "path": "data/claim-taxonomy.md",
+      "tags": [
+        "方法论",
+        "证据链"
+      ],
+      "summary": "来自 Mira 方法论目录：data/claim-taxonomy.md",
+      "category": "methods",
+      "size": 6345,
+      "modifiedAt": 1781016448.0882604
+    },
+    {
+      "id": "method-data-controlled-vocabulary-md",
+      "title": "controlled-vocabulary.md",
+      "type": "md",
+      "path": "data/controlled-vocabulary.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：data/controlled-vocabulary.md",
+      "category": "methods",
+      "size": 24365,
+      "modifiedAt": 1782381997.611265
+    },
+    {
+      "id": "method-data-evidence-log-schema-md",
+      "title": "evidence-log-schema.md",
+      "type": "md",
+      "path": "data/evidence-log-schema.md",
+      "tags": [
+        "方法论",
+        "证据链"
+      ],
+      "summary": "来自 Mira 方法论目录：data/evidence-log-schema.md",
+      "category": "methods",
+      "size": 8315,
+      "modifiedAt": 1781016448.0892599
+    },
+    {
+      "id": "method-data-evidence-posture-taxonomy-md",
+      "title": "evidence-posture-taxonomy.md",
+      "type": "md",
+      "path": "data/evidence-posture-taxonomy.md",
+      "tags": [
+        "方法论",
+        "证据链"
+      ],
+      "summary": "来自 Mira 方法论目录：data/evidence-posture-taxonomy.md",
+      "category": "methods",
+      "size": 4250,
+      "modifiedAt": 1781016448.0902607
+    },
+    {
+      "id": "method-data-handoff-contracts-md",
+      "title": "handoff-contracts.md",
+      "type": "md",
+      "path": "data/handoff-contracts.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：data/handoff-contracts.md",
+      "category": "methods",
+      "size": 2715,
+      "modifiedAt": 1781016448.0902607
+    },
+    {
+      "id": "method-data-ingestion-layer-md",
+      "title": "ingestion-layer.md",
+      "type": "md",
+      "path": "data/ingestion-layer.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：data/ingestion-layer.md",
+      "category": "methods",
+      "size": 8188,
+      "modifiedAt": 1781016448.0912583
+    },
+    {
+      "id": "method-data-instrument-strategy-gate-md",
+      "title": "instrument-strategy-gate.md",
+      "type": "md",
+      "path": "data/instrument-strategy-gate.md",
+      "tags": [
+        "方法论",
+        "技术分析",
+        "风控边界"
+      ],
+      "summary": "来自 Mira 方法论目录：data/instrument-strategy-gate.md",
+      "category": "methods",
+      "size": 6495,
+      "modifiedAt": 1781016448.0922582
+    },
+    {
+      "id": "method-data-interaction-kernel-md",
+      "title": "interaction-kernel.md",
+      "type": "md",
+      "path": "data/interaction-kernel.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：data/interaction-kernel.md",
+      "category": "methods",
+      "size": 4018,
+      "modifiedAt": 1781016448.0922582
+    },
+    {
+      "id": "method-data-live-data-source-policy-md",
+      "title": "live-data-source-policy.md",
+      "type": "md",
+      "path": "data/live-data-source-policy.md",
+      "tags": [
+        "方法论",
+        "证据链"
+      ],
+      "summary": "来自 Mira 方法论目录：data/live-data-source-policy.md",
+      "category": "methods",
+      "size": 6992,
+      "modifiedAt": 1781923486.8480186
+    },
+    {
+      "id": "method-data-methodology-source-policy-md",
+      "title": "methodology-source-policy.md",
+      "type": "md",
+      "path": "data/methodology-source-policy.md",
+      "tags": [
+        "方法论",
+        "证据链"
+      ],
+      "summary": "来自 Mira 方法论目录：data/methodology-source-policy.md",
+      "category": "methods",
+      "size": 4434,
+      "modifiedAt": 1781016448.096478
+    },
+    {
+      "id": "method-data-output-surface-matrix-md",
+      "title": "output-surface-matrix.md",
+      "type": "md",
+      "path": "data/output-surface-matrix.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：data/output-surface-matrix.md",
+      "category": "methods",
+      "size": 6703,
+      "modifiedAt": 1781016448.0974896
+    },
+    {
+      "id": "method-data-public-source-targets-md",
+      "title": "public-source-targets.md",
+      "type": "md",
+      "path": "data/public-source-targets.md",
+      "tags": [
+        "方法论",
+        "证据链"
+      ],
+      "summary": "来自 Mira 方法论目录：data/public-source-targets.md",
+      "category": "methods",
+      "size": 13354,
+      "modifiedAt": 1781016448.0984912
+    },
+    {
+      "id": "method-data-question-expansion-lenses-md",
+      "title": "question-expansion-lenses.md",
+      "type": "md",
+      "path": "data/question-expansion-lenses.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：data/question-expansion-lenses.md",
+      "category": "methods",
+      "size": 4916,
+      "modifiedAt": 1781016448.0984912
+    },
+    {
+      "id": "method-data-research-readiness-gate-md",
+      "title": "research-readiness-gate.md",
+      "type": "md",
+      "path": "data/research-readiness-gate.md",
+      "tags": [
+        "方法论",
+        "风控边界"
+      ],
+      "summary": "来自 Mira 方法论目录：data/research-readiness-gate.md",
+      "category": "methods",
+      "size": 2456,
+      "modifiedAt": 1781016448.0994887
+    },
+    {
+      "id": "method-data-source-policy-md",
+      "title": "source-policy.md",
+      "type": "md",
+      "path": "data/source-policy.md",
+      "tags": [
+        "方法论",
+        "证据链"
+      ],
+      "summary": "来自 Mira 方法论目录：data/source-policy.md",
+      "category": "methods",
+      "size": 7933,
+      "modifiedAt": 1781016448.1021926
+    },
+    {
+      "id": "method-data-source-schema-md",
+      "title": "source-schema.md",
+      "type": "md",
+      "path": "data/source-schema.md",
+      "tags": [
+        "方法论",
+        "证据链"
+      ],
+      "summary": "来自 Mira 方法论目录：data/source-schema.md",
+      "category": "methods",
+      "size": 8248,
+      "modifiedAt": 1781016448.1033401
+    },
+    {
+      "id": "method-data-source-taxonomy-md",
+      "title": "source-taxonomy.md",
+      "type": "md",
+      "path": "data/source-taxonomy.md",
+      "tags": [
+        "方法论",
+        "证据链"
+      ],
+      "summary": "来自 Mira 方法论目录：data/source-taxonomy.md",
+      "category": "methods",
+      "size": 10978,
+      "modifiedAt": 1781016448.104351
+    },
+    {
+      "id": "method-data-time-policy-md",
+      "title": "time-policy.md",
+      "type": "md",
+      "path": "data/time-policy.md",
+      "tags": [
+        "方法论"
+      ],
+      "summary": "来自 Mira 方法论目录：data/time-policy.md",
+      "category": "methods",
+      "size": 1688,
+      "modifiedAt": 1781016448.104351
+    }
+  ],
+  "deepReports": [
+    {
+      "title": "investment-memo.md",
+      "type": "Mira 深度研究",
+      "path": "private/research/600276.SH_恒瑞医药/investment-memo.md",
+      "date": "2026-06-23",
+      "summary": "恒瑞当前保持 working_view：创新药出海与政策风险是核心变量，价格层面只能作为市场定价信号。"
+    }
+  ],
+  "objectLibraryFiles": [
+    {
+      "title": "report-readout-国金证券-20260620.md",
+      "type": "研报解读",
+      "path": "private/research/600276.SH_恒瑞医药/report-readout-国金证券-20260620.md",
+      "date": "2026-06-20",
+      "summary": "拆解卖方报告中的收入、管线、估值和政策假设，并映射到 Mira evidence-log 与 claim map。"
+    },
+    {
+      "title": "policy-monitor-2026-06-23.md",
+      "type": "政策监控",
+      "path": "private/research/600276.SH_恒瑞医药/policy-monitor-2026-06-23.md",
+      "date": "2026-06-23",
+      "summary": "跟踪美国/FDA 相关政策信号，区分政策信号强度和法律约束力，更新 thesis 风险边界。"
+    },
+    {
+      "title": "H3_AP202606221823720809_1国金证券.pdf",
+      "type": "PDF 附件",
+      "path": "private/research/600276.SH_恒瑞医药/H3_AP202606221823720809_1国金证券.pdf",
+      "date": "2026-06-22",
+      "summary": "原始研报 PDF 附件。v1 原型展示元信息，后续接入 PDF 嵌入预览和页码定位。"
+    }
+  ],
+  "activity": [
+    [
+      "price",
+      "股价行情已刷新",
+      "technical-analysis-check.csv / evidence-log.csv appended",
+      "2026-06-25 16:14"
+    ],
+    [
+      "news",
+      "行业新闻扫描完成",
+      "monitor-2026-06-25.md created; source freshness partial",
+      "2026-06-25 16:10"
+    ],
+    [
+      "warn",
+      "source_gap",
+      "未发现发行人公告，新闻仅作事件发现",
+      "2026-06-25 16:05"
+    ]
+  ],
+  "industryDocs": [
+    {
+      "id": "industry-东莞证券-基础化工行业研究",
+      "title": "东莞证券-基础化工行业研究.pdf",
+      "type": "pdf",
+      "path": "行业资料/东莞证券-基础化工行业研究.pdf",
+      "tags": [
+        "行业资料"
+      ],
+      "summary": "来自 行业资料 目录的文件：东莞证券-基础化工行业研究.pdf",
+      "category": "industry",
+      "size": 1508062,
+      "modifiedAt": 1782159360.0216591
+    },
+    {
+      "id": "industry-期权投资策略（原书第5版） (劳伦斯 G. 麦克米伦) (z-lib.org)",
+      "title": "期权投资策略（原书第5版） (劳伦斯 G. 麦克米伦) (z-lib.org).pdf",
+      "type": "pdf",
+      "path": "行业资料/期权投资策略（原书第5版） (劳伦斯 G. 麦克米伦) (z-lib.org).pdf",
+      "tags": [
+        "行业资料"
+      ],
+      "summary": "来自 行业资料 目录的文件：期权投资策略（原书第5版） (劳伦斯 G. 麦克米伦) (z-lib.org).pdf",
+      "category": "industry",
+      "size": 292249795,
+      "modifiedAt": 1649037992.0
+    }
+  ],
+  "miraIndex": {
+    "status": "static_snapshot",
+    "miraRoot": "",
+    "researchRoot": "",
+    "objects": [
+      {
+        "id": "000807.SZ_云铝股份",
+        "ticker": "000807.SZ",
+        "name": "云铝股份",
+        "path": "private/research/000807.SZ_云铝股份",
+        "fileCount": 7,
+        "latestModifiedAt": 1782271227.7288582,
+        "files": [
+          {
+            "title": "aluminum-price-profit-correlation.csv",
+            "type": "csv",
+            "path": "private/research/000807.SZ_云铝股份/aluminum-price-profit-correlation.csv",
+            "size": 877,
+            "modifiedAt": 1782271227.7274127
+          },
+          {
+            "title": "aluminum-price-profit-correlation.md",
+            "type": "md",
+            "path": "private/research/000807.SZ_云铝股份/aluminum-price-profit-correlation.md",
+            "size": 3996,
+            "modifiedAt": 1782271227.7288582
+          },
+          {
+            "title": "calculation-ledger.csv",
+            "type": "csv",
+            "path": "private/research/000807.SZ_云铝股份/calculation-ledger.csv",
+            "size": 1210,
+            "modifiedAt": 1781526275.422749
+          },
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/000807.SZ_云铝股份/case-notes.md",
+            "size": 2438,
+            "modifiedAt": 1781526275.4237673
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/000807.SZ_云铝股份/evidence-log.csv",
+            "size": 3179,
+            "modifiedAt": 1781526275.422749
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/000807.SZ_云铝股份/investment-memo.md",
+            "size": 10691,
+            "modifiedAt": 1781526275.4222424
+          },
+          {
+            "title": "research-report.html",
+            "type": "html",
+            "path": "private/research/000807.SZ_云铝股份/research-report.html",
+            "size": 7541,
+            "modifiedAt": 1781526275.4267733
+          }
+        ]
+      },
+      {
+        "id": "002028.SZ_思源电气",
+        "ticker": "002028.SZ",
+        "name": "思源电气",
+        "path": "private/research/002028.SZ_思源电气",
+        "fileCount": 5,
+        "latestModifiedAt": 1781669895.8950331,
+        "files": [
+          {
+            "title": "calculation-ledger.csv",
+            "type": "csv",
+            "path": "private/research/002028.SZ_思源电气/calculation-ledger.csv",
+            "size": 1666,
+            "modifiedAt": 1781602344.956967
+          },
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/002028.SZ_思源电气/case-notes.md",
+            "size": 3784,
+            "modifiedAt": 1781602344.9579675
+          },
+          {
+            "title": "event-delta-toshiba-acquisition.md",
+            "type": "md",
+            "path": "private/research/002028.SZ_思源电气/event-delta-toshiba-acquisition.md",
+            "size": 6767,
+            "modifiedAt": 1781669895.8950331
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/002028.SZ_思源电气/evidence-log.csv",
+            "size": 6862,
+            "modifiedAt": 1781602344.9559667
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/002028.SZ_思源电气/investment-memo.md",
+            "size": 11253,
+            "modifiedAt": 1781602344.9559667
+          }
+        ]
+      },
+      {
+        "id": "002128.SZ_电投能源",
+        "ticker": "002128.SZ",
+        "name": "电投能源",
+        "path": "private/research/002128.SZ_电投能源",
+        "fileCount": 12,
+        "latestModifiedAt": 1781579130.7133415,
+        "files": [
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/002128.SZ_电投能源/case-notes.md",
+            "size": 3956,
+            "modifiedAt": 1781154140.3527026
+          },
+          {
+            "title": "diantou-2025-annual-report.pdf",
+            "type": "pdf",
+            "path": "private/research/002128.SZ_电投能源/diantou-2025-annual-report.pdf",
+            "size": 1599089,
+            "modifiedAt": 1781153452.1457999
+          },
+          {
+            "title": "diantou-2025-dividend.pdf",
+            "type": "pdf",
+            "path": "private/research/002128.SZ_电投能源/diantou-2025-dividend.pdf",
+            "size": 166270,
+            "modifiedAt": 1781153450.6756015
+          },
+          {
+            "title": "diantou-2026q1-report.pdf",
+            "type": "pdf",
+            "path": "private/research/002128.SZ_电投能源/diantou-2026q1-report.pdf",
+            "size": 169783,
+            "modifiedAt": 1781153452.4656978
+          },
+          {
+            "title": "diantou-ir-2026-04-28.pdf",
+            "type": "pdf",
+            "path": "private/research/002128.SZ_电投能源/diantou-ir-2026-04-28.pdf",
+            "size": 188338,
+            "modifiedAt": 1781153450.4499738
+          },
+          {
+            "title": "diantou-ir-2026-05-27.pdf",
+            "type": "pdf",
+            "path": "private/research/002128.SZ_电投能源/diantou-ir-2026-05-27.pdf",
+            "size": 163197,
+            "modifiedAt": 1781153454.0115294
+          },
+          {
+            "title": "diantou-reorg-implementation.pdf",
+            "type": "pdf",
+            "path": "private/research/002128.SZ_电投能源/diantou-reorg-implementation.pdf",
+            "size": 1044630,
+            "modifiedAt": 1781153453.4919758
+          },
+          {
+            "title": "diantou-reorg-report-registered.pdf",
+            "type": "pdf",
+            "path": "private/research/002128.SZ_电投能源/diantou-reorg-report-registered.pdf",
+            "size": 3864472,
+            "modifiedAt": 1781153450.2654676
+          },
+          {
+            "title": "diantou-reorg-result-share-change.pdf",
+            "type": "pdf",
+            "path": "private/research/002128.SZ_电投能源/diantou-reorg-result-share-change.pdf",
+            "size": 372954,
+            "modifiedAt": 1781153453.840533
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/002128.SZ_电投能源/evidence-log.csv",
+            "size": 7823,
+            "modifiedAt": 1781579130.7133415
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/002128.SZ_电投能源/investment-memo.md",
+            "size": 15378,
+            "modifiedAt": 1781154140.1309488
+          },
+          {
+            "title": "monitoring-update-2026-06-16.md",
+            "type": "md",
+            "path": "private/research/002128.SZ_电投能源/monitoring-update-2026-06-16.md",
+            "size": 4930,
+            "modifiedAt": 1781579130.712083
+          }
+        ]
+      },
+      {
+        "id": "002714.SZ_牧原股份",
+        "ticker": "002714.SZ",
+        "name": "牧原股份",
+        "path": "private/research/002714.SZ_牧原股份",
+        "fileCount": 4,
+        "latestModifiedAt": 1782462096.110367,
+        "files": [
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/002714.SZ_牧原股份/case-notes.md",
+            "size": 4156,
+            "modifiedAt": 1781427099.9445193
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/002714.SZ_牧原股份/evidence-log.csv",
+            "size": 5242,
+            "modifiedAt": 1781427099.8400395
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/002714.SZ_牧原股份/investment-memo.md",
+            "size": 8630,
+            "modifiedAt": 1781427099.7491424
+          },
+          {
+            "title": "market-update-2026-06-26.md",
+            "type": "md",
+            "path": "private/research/002714.SZ_牧原股份/market-update-2026-06-26.md",
+            "size": 1269,
+            "modifiedAt": 1782462096.110367
+          }
+        ]
+      },
+      {
+        "id": "00700.HK_腾讯控股",
+        "ticker": "00700.HK",
+        "name": "腾讯控股",
+        "path": "private/research/00700.HK_腾讯控股",
+        "fileCount": 3,
+        "latestModifiedAt": 1781504857.6776936,
+        "files": [
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/00700.HK_腾讯控股/case-notes.md",
+            "size": 2323,
+            "modifiedAt": 1781504857.6776936
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/00700.HK_腾讯控股/evidence-log.csv",
+            "size": 5262,
+            "modifiedAt": 1781504857.6766977
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/00700.HK_腾讯控股/investment-memo.md",
+            "size": 11573,
+            "modifiedAt": 1781504857.6776936
+          }
+        ]
+      },
+      {
+        "id": "09992.HK_泡泡玛特",
+        "ticker": "09992.HK",
+        "name": "泡泡玛特",
+        "path": "private/research/09992.HK_泡泡玛特",
+        "fileCount": 4,
+        "latestModifiedAt": 1781533078.4538367,
+        "files": [
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/09992.HK_泡泡玛特/case-notes.md",
+            "size": 4945,
+            "modifiedAt": 1781533065.797893
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/09992.HK_泡泡玛特/evidence-log.csv",
+            "size": 10855,
+            "modifiedAt": 1781533065.7963953
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/09992.HK_泡泡玛特/investment-memo.md",
+            "size": 17589,
+            "modifiedAt": 1781533078.4538367
+          },
+          {
+            "title": "peer-comparison.csv",
+            "type": "csv",
+            "path": "private/research/09992.HK_泡泡玛特/peer-comparison.csv",
+            "size": 2323,
+            "modifiedAt": 1781533027.7446537
+          }
+        ]
+      },
+      {
+        "id": "600096.SH_云天化",
+        "ticker": "600096.SH",
+        "name": "云天化",
+        "path": "private/research/600096.SH_云天化",
+        "fileCount": 9,
+        "latestModifiedAt": 1782462032.9454334,
+        "files": [
+          {
+            "title": "calculation-ledger.csv",
+            "type": "csv",
+            "path": "private/research/600096.SH_云天化/calculation-ledger.csv",
+            "size": 1628,
+            "modifiedAt": 1781495335.3892484
+          },
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/600096.SH_云天化/case-notes.md",
+            "size": 4562,
+            "modifiedAt": 1781495335.3877666
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/600096.SH_云天化/evidence-log.csv",
+            "size": 8585,
+            "modifiedAt": 1781495335.3877666
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/600096.SH_云天化/investment-memo.md",
+            "size": 10518,
+            "modifiedAt": 1781495335.3867698
+          },
+          {
+            "title": "market-update-2026-06-22.md",
+            "type": "md",
+            "path": "private/research/600096.SH_云天化/market-update-2026-06-22.md",
+            "size": 7102,
+            "modifiedAt": 1782107863.513267
+          },
+          {
+            "title": "market-update-2026-06-24.md",
+            "type": "md",
+            "path": "private/research/600096.SH_云天化/market-update-2026-06-24.md",
+            "size": 2848,
+            "modifiedAt": 1782290237.2173347
+          },
+          {
+            "title": "market-update-2026-06-26.md",
+            "type": "md",
+            "path": "private/research/600096.SH_云天化/market-update-2026-06-26.md",
+            "size": 7237,
+            "modifiedAt": 1782462032.9454334
+          },
+          {
+            "title": "validation-variables-2026-06-24.md",
+            "type": "md",
+            "path": "private/research/600096.SH_云天化/validation-variables-2026-06-24.md",
+            "size": 6716,
+            "modifiedAt": 1782294015.3910654
+          },
+          {
+            "title": "yth_spread_sulfur_sensitivity_model.xlsx",
+            "type": "xlsx",
+            "path": "private/research/600096.SH_云天化/yth_spread_sulfur_sensitivity_model.xlsx",
+            "size": 16860,
+            "modifiedAt": 1781501031.5781047
+          }
+        ]
+      },
+      {
+        "id": "600276.SH_恒瑞医药",
+        "ticker": "600276.SH",
+        "name": "恒瑞医药",
+        "path": "private/research/600276.SH_恒瑞医药",
+        "fileCount": 11,
+        "latestModifiedAt": 1782461342.7699034,
+        "files": [
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/600276.SH_恒瑞医药/case-notes.md",
+            "size": 3130,
+            "modifiedAt": 1782461221.6610126
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/600276.SH_恒瑞医药/evidence-log.csv",
+            "size": 9671,
+            "modifiedAt": 1782461342.7699034
+          },
+          {
+            "title": "H3_AP202606221823720809_1国金证券.pdf",
+            "type": "pdf",
+            "path": "private/research/600276.SH_恒瑞医药/H3_AP202606221823720809_1国金证券.pdf",
+            "size": 2835818,
+            "modifiedAt": 1782310271.6384737
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/600276.SH_恒瑞医药/investment-memo.md",
+            "size": 13551,
+            "modifiedAt": 1782461175.7714212
+          },
+          {
+            "title": "monitor-2026-06-23.md",
+            "type": "md",
+            "path": "private/research/600276.SH_恒瑞医药/monitor-2026-06-23.md",
+            "size": 4735,
+            "modifiedAt": 1782242397.804893
+          },
+          {
+            "title": "monitor-2026-06-26.md",
+            "type": "md",
+            "path": "private/research/600276.SH_恒瑞医药/monitor-2026-06-26.md",
+            "size": 4542,
+            "modifiedAt": 1782461207.9368148
+          },
+          {
+            "title": "policy-monitor-2026-06-23.md",
+            "type": "md",
+            "path": "private/research/600276.SH_恒瑞医药/policy-monitor-2026-06-23.md",
+            "size": 5613,
+            "modifiedAt": 1782244532.8320026
+          },
+          {
+            "title": "report-claim-map-国金证券-20260620.csv",
+            "type": "csv",
+            "path": "private/research/600276.SH_恒瑞医药/report-claim-map-国金证券-20260620.csv",
+            "size": 2974,
+            "modifiedAt": 1782310697.1077244
+          },
+          {
+            "title": "report-readout-国金证券-20260620.md",
+            "type": "md",
+            "path": "private/research/600276.SH_恒瑞医药/report-readout-国金证券-20260620.md",
+            "size": 9527,
+            "modifiedAt": 1782310697.1064856
+          },
+          {
+            "title": "research-report.html",
+            "type": "html",
+            "path": "private/research/600276.SH_恒瑞医药/research-report.html",
+            "size": 8163,
+            "modifiedAt": 1781442603.8345003
+          },
+          {
+            "title": "restricted-source-note-国金证券-20260620.md",
+            "type": "md",
+            "path": "private/research/600276.SH_恒瑞医药/restricted-source-note-国金证券-20260620.md",
+            "size": 1473,
+            "modifiedAt": 1782310697.1105254
+          }
+        ]
+      },
+      {
+        "id": "600309.SH_万华化学",
+        "ticker": "600309.SH",
+        "name": "万华化学",
+        "path": "private/research/600309.SH_万华化学",
+        "fileCount": 4,
+        "latestModifiedAt": 1781533431.3714492,
+        "files": [
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/600309.SH_万华化学/case-notes.md",
+            "size": 3359,
+            "modifiedAt": 1781533431.3714492
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/600309.SH_万华化学/evidence-log.csv",
+            "size": 3530,
+            "modifiedAt": 1781533431.3701096
+          },
+          {
+            "title": "initiation-report.html",
+            "type": "html",
+            "path": "private/research/600309.SH_万华化学/initiation-report.html",
+            "size": 8074,
+            "modifiedAt": 1781533431.3714492
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/600309.SH_万华化学/investment-memo.md",
+            "size": 11228,
+            "modifiedAt": 1781533431.3691182
+          }
+        ]
+      },
+      {
+        "id": "600763.SH_通策医疗",
+        "ticker": "600763.SH",
+        "name": "通策医疗",
+        "path": "private/research/600763.SH_通策医疗",
+        "fileCount": 4,
+        "latestModifiedAt": 1781405905.8187308,
+        "files": [
+          {
+            "title": "calculation-ledger.csv",
+            "type": "csv",
+            "path": "private/research/600763.SH_通策医疗/calculation-ledger.csv",
+            "size": 1496,
+            "modifiedAt": 1781405905.7351873
+          },
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/600763.SH_通策医疗/case-notes.md",
+            "size": 2784,
+            "modifiedAt": 1781405905.64997
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/600763.SH_通策医疗/evidence-log.csv",
+            "size": 6220,
+            "modifiedAt": 1781405905.8187308
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/600763.SH_通策医疗/investment-memo.md",
+            "size": 12449,
+            "modifiedAt": 1781405905.5628264
+          }
+        ]
+      },
+      {
+        "id": "600989.SH_宝丰能源",
+        "ticker": "600989.SH",
+        "name": "宝丰能源",
+        "path": "private/research/600989.SH_宝丰能源",
+        "fileCount": 5,
+        "latestModifiedAt": 1782218909.5998328,
+        "files": [
+          {
+            "title": "baofeng-2025-annual-report.pdf",
+            "type": "pdf",
+            "path": "private/research/600989.SH_宝丰能源/baofeng-2025-annual-report.pdf",
+            "size": 1670664,
+            "modifiedAt": 1781092733.1592143
+          },
+          {
+            "title": "baofeng-2026q1-report.pdf",
+            "type": "pdf",
+            "path": "private/research/600989.SH_宝丰能源/baofeng-2026q1-report.pdf",
+            "size": 147876,
+            "modifiedAt": 1781092733.3670406
+          },
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/600989.SH_宝丰能源/case-notes.md",
+            "size": 15036,
+            "modifiedAt": 1782218873.0136595
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/600989.SH_宝丰能源/evidence-log.csv",
+            "size": 17976,
+            "modifiedAt": 1782218909.5998328
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/600989.SH_宝丰能源/investment-memo.md",
+            "size": 47133,
+            "modifiedAt": 1782218873.011661
+          }
+        ]
+      },
+      {
+        "id": "601872.SH_招商轮船",
+        "ticker": "601872.SH",
+        "name": "招商轮船",
+        "path": "private/research/601872.SH_招商轮船",
+        "fileCount": 3,
+        "latestModifiedAt": 1781329481.288537,
+        "files": [
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/601872.SH_招商轮船/case-notes.md",
+            "size": 4285,
+            "modifiedAt": 1781329481.288537
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/601872.SH_招商轮船/evidence-log.csv",
+            "size": 5752,
+            "modifiedAt": 1781329460.2811666
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/601872.SH_招商轮船/investment-memo.md",
+            "size": 10511,
+            "modifiedAt": 1781329459.964787
+          }
+        ]
+      },
+      {
+        "id": "601898.SH_中煤能源",
+        "ticker": "601898.SH",
+        "name": "中煤能源",
+        "path": "private/research/601898.SH_中煤能源",
+        "fileCount": 12,
+        "latestModifiedAt": 1782488044.1703577,
+        "files": [
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/601898.SH_中煤能源/case-notes.md",
+            "size": 3984,
+            "modifiedAt": 1781145956.2249653
+          },
+          {
+            "title": "china-coal-2025-annual-report.pdf",
+            "type": "pdf",
+            "path": "private/research/601898.SH_中煤能源/china-coal-2025-annual-report.pdf",
+            "size": 1660262,
+            "modifiedAt": 1781145475.0202336
+          },
+          {
+            "title": "china-coal-2026-01-operating-data.pdf",
+            "type": "pdf",
+            "path": "private/research/601898.SH_中煤能源/china-coal-2026-01-operating-data.pdf",
+            "size": 116013,
+            "modifiedAt": 1781145475.94923
+          },
+          {
+            "title": "china-coal-2026-02-operating-data.pdf",
+            "type": "pdf",
+            "path": "private/research/601898.SH_中煤能源/china-coal-2026-02-operating-data.pdf",
+            "size": 117579,
+            "modifiedAt": 1781145473.908401
+          },
+          {
+            "title": "china-coal-2026-03-operating-data.pdf",
+            "type": "pdf",
+            "path": "private/research/601898.SH_中煤能源/china-coal-2026-03-operating-data.pdf",
+            "size": 117418,
+            "modifiedAt": 1781145475.440892
+          },
+          {
+            "title": "china-coal-2026-04-operating-data.pdf",
+            "type": "pdf",
+            "path": "private/research/601898.SH_中煤能源/china-coal-2026-04-operating-data.pdf",
+            "size": 117281,
+            "modifiedAt": 1781145475.6618612
+          },
+          {
+            "title": "china-coal-2026q1-report.pdf",
+            "type": "pdf",
+            "path": "private/research/601898.SH_中煤能源/china-coal-2026q1-report.pdf",
+            "size": 242029,
+            "modifiedAt": 1781145475.226227
+          },
+          {
+            "title": "china-coal-ir-2026-05-15.pdf",
+            "type": "pdf",
+            "path": "private/research/601898.SH_中煤能源/china-coal-ir-2026-05-15.pdf",
+            "size": 152510,
+            "modifiedAt": 1781145475.5502286
+          },
+          {
+            "title": "china-coal-ir-2026-05-20.pdf",
+            "type": "pdf",
+            "path": "private/research/601898.SH_中煤能源/china-coal-ir-2026-05-20.pdf",
+            "size": 159618,
+            "modifiedAt": 1781145475.776467
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/601898.SH_中煤能源/evidence-log.csv",
+            "size": 6317,
+            "modifiedAt": 1781145925.2905369
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/601898.SH_中煤能源/investment-memo.md",
+            "size": 15881,
+            "modifiedAt": 1781145875.3993604
+          },
+          {
+            "title": "market-update-2026-06-26.md",
+            "type": "md",
+            "path": "private/research/601898.SH_中煤能源/market-update-2026-06-26.md",
+            "size": 5606,
+            "modifiedAt": 1782488044.1703577
+          }
+        ]
+      },
+      {
+        "id": "688981.SH_中芯国际",
+        "ticker": "688981.SH",
+        "name": "中芯国际",
+        "path": "private/research/688981.SH_中芯国际",
+        "fileCount": 7,
+        "latestModifiedAt": 1781529294.3418117,
+        "files": [
+          {
+            "title": "calculation-ledger.csv",
+            "type": "csv",
+            "path": "private/research/688981.SH_中芯国际/calculation-ledger.csv",
+            "size": 9017,
+            "modifiedAt": 1781528242.658711
+          },
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/688981.SH_中芯国际/case-notes.md",
+            "size": 4659,
+            "modifiedAt": 1781526985.5494926
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/688981.SH_中芯国际/evidence-log.csv",
+            "size": 12071,
+            "modifiedAt": 1781529294.340299
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/688981.SH_中芯国际/investment-memo.md",
+            "size": 30000,
+            "modifiedAt": 1781529294.340299
+          },
+          {
+            "title": "model-upgrade-map.csv",
+            "type": "csv",
+            "path": "private/research/688981.SH_中芯国际/model-upgrade-map.csv",
+            "size": 5497,
+            "modifiedAt": 1781527922.0970087
+          },
+          {
+            "title": "peer-comparison-tsmc.csv",
+            "type": "csv",
+            "path": "private/research/688981.SH_中芯国际/peer-comparison-tsmc.csv",
+            "size": 2202,
+            "modifiedAt": 1781529294.3418117
+          },
+          {
+            "title": "source-register.csv",
+            "type": "csv",
+            "path": "private/research/688981.SH_中芯国际/source-register.csv",
+            "size": 2350,
+            "modifiedAt": 1781528242.659711
+          }
+        ]
+      },
+      {
+        "id": "A股铝产业链",
+        "ticker": "",
+        "name": "A股铝产业链",
+        "path": "private/research/A股铝产业链",
+        "fileCount": 2,
+        "latestModifiedAt": 1782634563.9230556,
+        "files": [
+          {
+            "title": "A股铝产业链横向研究.md",
+            "type": "md",
+            "path": "private/research/A股铝产业链/A股铝产业链横向研究.md",
+            "size": 16270,
+            "modifiedAt": 1782634563.9230556
+          },
+          {
+            "title": "铝产业链产能库存周期研究.md",
+            "type": "md",
+            "path": "private/research/A股铝产业链/铝产业链产能库存周期研究.md",
+            "size": 13647,
+            "modifiedAt": 1782634563.9230556
+          }
+        ]
+      },
+      {
+        "id": "化工行业",
+        "ticker": "",
+        "name": "化工行业",
+        "path": "private/research/化工行业",
+        "fileCount": 4,
+        "latestModifiedAt": 1782634563.920055,
+        "files": [
+          {
+            "title": "report-claim-map.csv",
+            "type": "csv",
+            "path": "private/research/化工行业/report-claim-map.csv",
+            "size": 4970,
+            "modifiedAt": 1782159574.5230498
+          },
+          {
+            "title": "基础化工2026下半年策略研报解读.md",
+            "type": "md",
+            "path": "private/research/化工行业/基础化工2026下半年策略研报解读.md",
+            "size": 6654,
+            "modifiedAt": 1782159574.5300415
+          },
+          {
+            "title": "用户材料接收记录.md",
+            "type": "md",
+            "path": "private/research/化工行业/用户材料接收记录.md",
+            "size": 1817,
+            "modifiedAt": 1782634563.920055
+          },
+          {
+            "title": "磷化工产能利用率与过剩判断-2026-06-23.md",
+            "type": "md",
+            "path": "private/research/化工行业/磷化工产能利用率与过剩判断-2026-06-23.md",
+            "size": 5065,
+            "modifiedAt": 1782234577.913962
+          }
+        ]
+      },
+      {
+        "id": "大宗商品_煤炭",
+        "ticker": "大宗商品",
+        "name": "煤炭",
+        "path": "private/research/大宗商品_煤炭",
+        "fileCount": 2,
+        "latestModifiedAt": 1782575654.0911927,
+        "files": [
+          {
+            "title": "commodity-cycle-note.md",
+            "type": "md",
+            "path": "private/research/大宗商品_煤炭/commodity-cycle-note.md",
+            "size": 13433,
+            "modifiedAt": 1782575654.0911927
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/大宗商品_煤炭/evidence-log.csv",
+            "size": 7065,
+            "modifiedAt": 1781496874.9628546
+          }
+        ]
+      },
+      {
+        "id": "大宗商品_石油",
+        "ticker": "大宗商品",
+        "name": "石油",
+        "path": "private/research/大宗商品_石油",
+        "fileCount": 3,
+        "latestModifiedAt": 1782575654.0961957,
+        "files": [
+          {
+            "title": "commodity-cycle-note.md",
+            "type": "md",
+            "path": "private/research/大宗商品_石油/commodity-cycle-note.md",
+            "size": 14217,
+            "modifiedAt": 1782575654.0952013
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/大宗商品_石油/evidence-log.csv",
+            "size": 16295,
+            "modifiedAt": 1781872023.4111893
+          },
+          {
+            "title": "gulf-production-recovery-note.md",
+            "type": "md",
+            "path": "private/research/大宗商品_石油/gulf-production-recovery-note.md",
+            "size": 10077,
+            "modifiedAt": 1782575654.0961957
+          }
+        ]
+      },
+      {
+        "id": "大宗商品_铝",
+        "ticker": "大宗商品",
+        "name": "铝",
+        "path": "private/research/大宗商品_铝",
+        "fileCount": 2,
+        "latestModifiedAt": 1782575844.0201323,
+        "files": [
+          {
+            "title": "commodity-cycle-note.md",
+            "type": "md",
+            "path": "private/research/大宗商品_铝/commodity-cycle-note.md",
+            "size": 10061,
+            "modifiedAt": 1782575844.0201323
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/大宗商品_铝/evidence-log.csv",
+            "size": 4957,
+            "modifiedAt": 1781495278.1865547
+          }
+        ]
+      },
+      {
+        "id": "大宗商品_黄金",
+        "ticker": "大宗商品",
+        "name": "黄金",
+        "path": "private/research/大宗商品_黄金",
+        "fileCount": 4,
+        "latestModifiedAt": 1782575654.0941978,
+        "files": [
+          {
+            "title": "case-notes.md",
+            "type": "md",
+            "path": "private/research/大宗商品_黄金/case-notes.md",
+            "size": 1848,
+            "modifiedAt": 1782575654.093198
+          },
+          {
+            "title": "evidence-log.csv",
+            "type": "csv",
+            "path": "private/research/大宗商品_黄金/evidence-log.csv",
+            "size": 5021,
+            "modifiedAt": 1782289618.3974397
+          },
+          {
+            "title": "investment-memo.md",
+            "type": "md",
+            "path": "private/research/大宗商品_黄金/investment-memo.md",
+            "size": 8408,
+            "modifiedAt": 1782575654.093198
+          },
+          {
+            "title": "monitor-update-2026-06-24.md",
+            "type": "md",
+            "path": "private/research/大宗商品_黄金/monitor-update-2026-06-24.md",
+            "size": 3839,
+            "modifiedAt": 1782575654.0941978
+          }
+        ]
+      },
+      {
+        "id": "行业贝塔反弹",
+        "ticker": "",
+        "name": "行业贝塔反弹",
+        "path": "private/research/行业贝塔反弹",
+        "fileCount": 2,
+        "latestModifiedAt": 1782634563.9020565,
+        "files": [
+          {
+            "title": "search-review-log.csv",
+            "type": "csv",
+            "path": "private/research/行业贝塔反弹/search-review-log.csv",
+            "size": 1341,
+            "modifiedAt": 1782244175.7594638
+          },
+          {
+            "title": "行业贝塔反弹方法卡.md",
+            "type": "md",
+            "path": "private/research/行业贝塔反弹/行业贝塔反弹方法卡.md",
+            "size": 9257,
+            "modifiedAt": 1782634563.9020565
+          }
+        ]
+      }
+    ]
+  }
+}
