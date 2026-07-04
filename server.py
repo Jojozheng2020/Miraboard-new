@@ -89,6 +89,18 @@ SINA_OPTION_HEADERS = {
     "Referer": SINA_OPTION_REFERER,
 }
 CHINA_TIMEZONE = _dt.timezone(_dt.timedelta(hours=8))
+
+
+def china_now() -> _dt.datetime:
+    return _dt.datetime.now(_dt.timezone.utc).astimezone(CHINA_TIMEZONE)
+
+
+def china_now_iso(*, timespec: str = "seconds") -> str:
+    return china_now().isoformat(timespec=timespec)
+
+
+def china_date_iso() -> str:
+    return china_now().date().isoformat()
 # 上海证券交易所 2026 年节假日休市安排（上证公告〔2025〕45号）。
 A_SHARE_HOLIDAY_RANGES = {
     2026: (
@@ -200,7 +212,7 @@ def register_write_preview(kind: str, ticker: str, target: Path, text: str, resp
         "previewExpiresAt": _dt.datetime.fromtimestamp(
             now + WRITE_PREVIEW_TTL_SECONDS,
             tz=_dt.timezone.utc,
-        ).isoformat(),
+        ).astimezone(CHINA_TIMEZONE).isoformat(),
         "document": build_preview_document(target, text),
     }
 
@@ -425,7 +437,7 @@ def update_ai_test_status(
         AI_CONFIG.update({
             "status": status,
             "message": message,
-            "testedAt": _dt.datetime.now().isoformat(timespec="seconds"),
+            "testedAt": china_now_iso(),
             "latencyMs": latency_ms,
         })
 
@@ -1185,7 +1197,7 @@ def fetch_eastmoney_quote_snapshot(ticker: str, market: str = "A股") -> dict:
             "history": history,
             "miraLevels": extract_mira_price_levels(ticker, price),
             "sourceDate": source_date,
-            "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+            "asOf": china_now_iso(),
             "url": source_url,
             "providerAttempts": [{"provider": "eastmoney", "status": "ok", "message": ""}],
         })
@@ -1272,7 +1284,7 @@ def fetch_stock_api_quote_snapshot(ticker: str, market: str = "A股") -> dict:
             "history": history,
             "miraLevels": extract_mira_price_levels(ticker, price),
             "sourceDate": source_date,
-            "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+            "asOf": china_now_iso(),
             "url": "https://github.com/zhangxiangliang/stock-api",
         })
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError, TypeError, ValueError) as exc:
@@ -1310,9 +1322,9 @@ def fetch_yahoo_quote_snapshot(ticker: str, market: str = "") -> dict:
             change_pct = change / previous * 100
         quote_time = meta.get("regularMarketTime")
         source_date = (
-            _dt.datetime.fromtimestamp(quote_time).date().isoformat()
+            _dt.datetime.fromtimestamp(quote_time, tz=_dt.timezone.utc).astimezone(CHINA_TIMEZONE).date().isoformat()
             if isinstance(quote_time, (int, float))
-            else _dt.date.today().isoformat()
+            else china_date_iso()
         )
         quote = {
             "status": "ok",
@@ -1329,7 +1341,7 @@ def fetch_yahoo_quote_snapshot(ticker: str, market: str = "") -> dict:
             "history": history,
             "miraLevels": extract_mira_price_levels(ticker, price),
             "sourceDate": source_date,
-            "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+            "asOf": china_now_iso(),
             "url": url,
         }
         return merge_eastmoney_quote_metadata(ticker, quote) if market == "A股" else quote
@@ -1469,7 +1481,7 @@ def option_row_to_quote(code: str, underlying: str, surface: dict, row: dict) ->
         "theta": row.get("theta"),
         "vega": row.get("vega"),
         "quality": option_quote_quality(row),
-        "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+        "asOf": china_now_iso(),
     }
 
 
@@ -1514,7 +1526,7 @@ def fetch_option_quote_snapshot(contract_code: str, underlying: str = "") -> dic
             else row.get("change_pct")
         )
         quote_time = row.get("quote_time") or ""
-        source_date = quote_time[:10] if len(quote_time) >= 10 else _dt.date.today().isoformat()
+        source_date = quote_time[:10] if len(quote_time) >= 10 else china_date_iso()
         return {
             "status": "ok",
             "symbol": code,
@@ -1547,7 +1559,7 @@ def fetch_option_quote_snapshot(contract_code: str, underlying: str = "") -> dic
             "vega": row.get("vega"),
             "quality": option_quote_quality(row),
             "url": url,
-            "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+            "asOf": china_now_iso(),
         }
     except Exception as exc:
         return quote_gap(code, "期权", "a_stock_data_sina_options", str(exc), url=url)
@@ -2039,7 +2051,7 @@ def build_existing_update_response(
 
 
 def current_china_market_date() -> _dt.date:
-    return _dt.datetime.now(_dt.timezone.utc).astimezone(CHINA_TIMEZONE).date()
+    return china_now().date()
 
 
 def is_a_share_trading_date(value: _dt.date) -> bool:
@@ -2145,7 +2157,7 @@ def archive_overview_quotes(payload: dict) -> dict:
             "count": 0,
             "message": f"归档日期应为 {expected_quote_date or '当日收盘日期'}，不写入 overview-quotes.csv",
         }
-    archived_at = _dt.datetime.now().isoformat(timespec="seconds")
+    archived_at = china_now_iso()
     fieldnames = [
         "archive_date", "symbol", "market", "name", "price", "previous_close", "change", "change_pct",
         "volume", "volume_ratio", "industry", "provider", "source_date", "as_of", "status", "message", "archived_at",
@@ -2214,7 +2226,7 @@ def refresh_tushare_history(payload: dict) -> dict:
         if value not in normalized:
             normalized.append(value)
 
-    end_text = str(payload.get("end") or a_share_market_session().get("expectedQuoteDate") or _dt.date.today().isoformat())
+    end_text = str(payload.get("end") or a_share_market_session().get("expectedQuoteDate") or china_date_iso())
     try:
         end_date = _dt.date.fromisoformat(end_text)
     except ValueError as exc:
@@ -2257,7 +2269,7 @@ def refresh_tushare_history(payload: dict) -> dict:
     except json.JSONDecodeError as exc:
         raise ValueError("TuShare history adapter returned invalid JSON") from exc
 
-    fetched_at = _dt.datetime.now().isoformat(timespec="seconds")
+    fetched_at = china_now_iso()
     archive_rows = []
     summaries = []
     successful_symbols = set()
@@ -2309,7 +2321,7 @@ def archive_portfolio_snapshot(payload: dict) -> dict:
     point = payload.get("seriesPoint") or {}
     if not positions or any(item.get("quoteStatus") != "ok" for item in positions):
         raise ValueError("portfolio archive requires complete quotes")
-    archived_at = _dt.datetime.now().isoformat(timespec="seconds")
+    archived_at = china_now_iso()
     position_fields = ["date","account","code","name","quantity","cost_price","multiplier","close_price","previous_close","market_value","floating_profit","quote_status","source"]
     position_rows = [{
         "date": date, "account": item.get("account"), "code": item.get("code"), "name": item.get("name"),
@@ -2455,8 +2467,8 @@ def first_number(values: list[float | None]) -> float:
 
 
 def render_market_update_markdown(folder: Path, quote: dict, analysis: dict) -> str:
-    now = _dt.datetime.now().isoformat(timespec="minutes")
-    source_date = quote.get("sourceDate") or _dt.date.today().isoformat()
+    now = china_now_iso(timespec="minutes")
+    source_date = quote.get("sourceDate") or china_date_iso()
     name = folder.name.split("_", 1)[1] if "_" in folder.name else folder.name
     ticker = quote.get("symbol") or folder.name.split("_", 1)[0]
     currency = quote.get("currency") or default_currency(quote.get("market", ""))
@@ -2556,7 +2568,7 @@ def extract_price_history(result: dict) -> list[dict]:
         high_value = max(high_value, open_value, close_value)
         low_value = min(low_value, open_value, close_value)
         rows.append({
-            "date": _dt.datetime.fromtimestamp(stamp).date().isoformat(),
+            "date": _dt.datetime.fromtimestamp(stamp, tz=_dt.timezone.utc).astimezone(CHINA_TIMEZONE).date().isoformat(),
             "open": round(open_value, 4),
             "high": round(high_value, 4),
             "low": round(low_value, 4),
@@ -2714,7 +2726,7 @@ def quote_gap(ticker: str, market: str, provider: str, message: str, *, url: str
         "provider": provider,
         "message": message,
         "url": url,
-        "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+        "asOf": china_now_iso(),
     }
 
 

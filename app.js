@@ -251,17 +251,28 @@ async function loadMarketSession() {
   return marketSessionData;
 }
 
-function buildLocalMarketSessionFallback(now = new Date()) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+function beijingDateParts(date = new Date()) {
+  return Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Shanghai",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-    weekday: "short",
-  }).formatToParts(now).filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+    hourCycle: "h23", weekday: "short",
+  }).formatToParts(date).filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+}
+
+function beijingDateIso(date = new Date()) {
+  const parts = beijingDateParts(date);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function formatBeijingTime(date = new Date(), includeDate = true) {
+  const parts = beijingDateParts(date);
+  const time = `${parts.hour}:${parts.minute}`;
+  return includeDate ? `${parts.year}-${parts.month}-${parts.day} ${time}` : time;
+}
+
+function buildLocalMarketSessionFallback(now = new Date()) {
+  const parts = beijingDateParts(now);
   const marketDate = `${parts.year}-${parts.month}-${parts.day}`;
   const holidayRanges = [
     ["2026-01-01", "2026-01-03"], ["2026-02-15", "2026-02-23"],
@@ -726,7 +737,7 @@ function getPortfolioAsOfDate() {
     .map(row => String(row?.date || "").trim())
     .filter(Boolean)
     .sort();
-  return transactionDates[transactionDates.length - 1] || new Date().toISOString().slice(0, 10);
+  return transactionDates[transactionDates.length - 1] || beijingDateIso();
 }
 
 function getPortfolioTransactionsForDate(account, asOfDate = getPortfolioAsOfDate()) {
@@ -1413,12 +1424,12 @@ function calculateBenchmarkReturn(series) {
 
 function portfolioSeriesForPeriod(series, period) {
   if (!series.length || period === "all") return series;
-  const end = new Date(`${series.at(-1).date}T00:00:00`);
+  const end = new Date(`${series.at(-1).date}T00:00:00Z`);
   const start = new Date(end);
-  if (period === "1m") start.setMonth(start.getMonth() - 1);
-  else if (period === "3m") start.setMonth(start.getMonth() - 3);
-  else if (period === "ytd") start.setMonth(0, 1);
-  else if (period === "1y") start.setFullYear(start.getFullYear() - 1);
+  if (period === "1m") start.setUTCMonth(start.getUTCMonth() - 1);
+  else if (period === "3m") start.setUTCMonth(start.getUTCMonth() - 3);
+  else if (period === "ytd") start.setUTCMonth(0, 1);
+  else if (period === "1y") start.setUTCFullYear(start.getUTCFullYear() - 1);
   const cutoff = start.toISOString().slice(0, 10);
   return series.filter(point => point.date >= cutoff);
 }
@@ -1803,7 +1814,7 @@ async function refreshPortfolioPrices(options = {}) {
     const now = new Date();
     if (statusNode) {
       statusNode.textContent = refreshComplete
-        ? `${trigger === "auto" ? "收盘行情已自动更新" : "行情已手动更新"} ${updated}/${refreshTargets.length} · ${now.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`
+        ? `${trigger === "auto" ? "收盘行情已自动更新" : "行情已手动更新"} ${updated}/${refreshTargets.length} · ${formatBeijingTime(now, false)} 北京时间`
         : updated
           ? `行情仅返回 ${updated}/${refreshTargets.length}，未采用本轮数据 · 已保留刷新前行情和今日收益`
           : `行情更新失败，已保留刷新前行情和今日收益${failures.length ? ` · ${failures[0]}` : ""}`;
@@ -2789,7 +2800,7 @@ function renderObjectTradeLog(object) {
     ? 0
     : currentPrice == null ? null : currentPrice * realized.openQuantity - realized.openCost;
   const generatedAt = portfolioPerformanceData?.generatedAt
-    ? new Date(portfolioPerformanceData.generatedAt).toLocaleString("zh-CN", { hour12: false })
+    ? new Date(portfolioPerformanceData.generatedAt).toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" })
     : "时间未知";
   return `
     <div class="trade-log-title">
@@ -3257,7 +3268,7 @@ function filePriority(file) {
 
 function formatDate(epochSeconds) {
   if (!epochSeconds) return "未知";
-  return new Date(epochSeconds * 1000).toISOString().slice(0, 10);
+  return beijingDateIso(new Date(epochSeconds * 1000));
 }
 
 function renderEvidenceQualityTable() {
@@ -3652,8 +3663,7 @@ function inferActivityTime(text = "") {
 }
 
 function formatActivityTime(date) {
-  const pad = value => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  return `${formatBeijingTime(date)} 北京时间`;
 }
 
 function attachTabs() {

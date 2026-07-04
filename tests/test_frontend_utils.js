@@ -35,5 +35,8 @@ assert.ok(appSource.includes('["ok", "read_only", "existing"].includes(payload?.
 assert.ok(appSource.includes("restorePreviousState()"));
 assert.ok(appSource.includes("行情更新失败，已保留刷新前行情和今日收益"));
 assert.ok(appSource.includes('group[0].target.account === "option" ? 120000 : 30000'));
+assert.ok(appSource.includes('timeZone: "Asia/Shanghai"'));
+assert.ok(appSource.includes("beijingDateIso()"));
+assert.ok(appSource.includes("北京时间"));
 
 console.log("frontend security and data utility tests passed");

@@ -17,6 +17,12 @@ import server
 
 
 class MarketAnalysisTests(unittest.TestCase):
+    def test_market_session_uses_beijing_date_across_utc_boundary(self):
+        result = server.a_share_market_session(
+            dt.datetime(2026, 7, 3, 17, 30, tzinfo=dt.timezone.utc))
+        self.assertEqual(result["marketDate"], "2026-07-04")
+        self.assertTrue(result["chinaNow"].startswith("2026-07-04T01:30:00+08:00"))
+
     def test_industry_analysis_files_link_to_equity_targets(self):
         index_objects = [
             {"id": "000807.SZ_云铝股份", "ticker": "000807.SZ", "name": "云铝股份", "files": []},
