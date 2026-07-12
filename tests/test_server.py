@@ -17,6 +17,26 @@ import server
 
 
 class MarketAnalysisTests(unittest.TestCase):
+    def test_parse_feed_symbols_rejects_path_like_values_and_caps_count(self):
+        symbols = server.parse_feed_symbols("600276.SH,../../bad,00700.HK,600276.SH")
+        self.assertEqual(symbols, ["600276.SH", "00700.HK"])
+        self.assertEqual(len(server.parse_feed_symbols(",".join(f"600{i:03d}.SH" for i in range(20)))), 12)
+
+    def test_fred_yield_keeps_source_date_and_daily_change(self):
+        csv_text = "DATE,DGS10\n2026-07-08,4.20\n2026-07-09,4.25\n"
+        with patch.object(server, "http_get_text", return_value=csv_text):
+            payload = server.fetch_fred_yield("us_10y", "美债 10Y", "DGS10")
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["sourceDate"], "2026-07-09")
+        self.assertAlmostEqual(payload["change"], 0.05)
+        self.assertEqual(payload["unit"], "%")
+
+    def test_market_session_uses_beijing_date_across_utc_boundary(self):
+        result = server.a_share_market_session(
+            dt.datetime(2026, 7, 3, 17, 30, tzinfo=dt.timezone.utc))
+        self.assertEqual(result["marketDate"], "2026-07-04")
+        self.assertTrue(result["chinaNow"].startswith("2026-07-04T01:30:00+08:00"))
+
     def test_industry_analysis_files_link_to_equity_targets(self):
         index_objects = [
             {"id": "000807.SZ_云铝股份", "ticker": "000807.SZ", "name": "云铝股份", "files": []},
@@ -47,6 +67,7 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertFalse(result["isTradingDay"])
         self.assertEqual(result["phase"], "closed_day")
         self.assertFalse(result["autoRefreshAllowed"])
+        self.assertTrue(result["archiveAllowed"])
 
     def test_a_share_market_session_skips_official_holiday(self):
         result = server.a_share_market_session(dt.datetime(2026, 10, 2, 4, 0, tzinfo=dt.timezone.utc))
@@ -114,6 +135,39 @@ class MarketAnalysisTests(unittest.TestCase):
         pairs = server.parse_quote_pairs("600000.SH,,00700.HK", "A股,,港股")
         self.assertEqual(pairs, [("600000.SH", "A股"), ("00700.HK", "港股")])
 
+    def test_quote_pairs_are_capped_at_forty(self):
+        symbols = ",".join(f"{index:06d}.SH" for index in range(80))
+        self.assertEqual(len(server.parse_quote_pairs(symbols, "")), 40)
+
+    def test_mira_levels_response_reads_latest_market_update_without_quote_refresh(self):
+        with tempfile.TemporaryDirectory() as directory:
+            mira_root = Path(directory)
+            folder = mira_root / "private" / "research" / "600276.SH_Test"
+            folder.mkdir(parents=True)
+            (folder / "market-update-2026-07-07.md").write_text(
+                "| level | value | meaning |\n"
+                "| --- | --- | --- |\n"
+                "| trigger_level | 57.77 | confirmation |\n"
+                "| invalidation_level | 45.26 | invalidation |\n",
+                encoding="utf-8",
+            )
+            with (
+                patch.object(server, "MIRA_ROOT", mira_root),
+                patch.object(server, "RESEARCH_ROOT", mira_root / "private" / "research"),
+            ):
+                result = server.build_mira_levels_response("600276.SH", "A股", "55.36")
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["items"][0]["levelCount"], 2)
+        self.assertEqual(result["items"][0]["miraLevels"][0]["value"], 57.77)
+
+    def test_quote_requests_keep_option_underlying_positions(self):
+        requests = server.parse_quote_requests(
+            "600000.SH,10011641", "A股,期权", ",588000")
+        self.assertEqual(
+            requests,
+            [("600000.SH", "A股", ""), ("10011641", "期权", "588000")],
+        )
+
     def test_bare_ticker_folder_uses_memo_heading_as_company_name(self):
         with tempfile.TemporaryDirectory() as directory:
             folder = Path(directory) / "603259.SH"
@@ -144,6 +198,24 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertEqual(result["name"], "Palantir Technologies")
         self.assertEqual(server.infer_market(result["ticker"]), "美股")
 
+    def test_routed_us_equity_underscore_scope_is_indexed_as_stock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder = root / "private" / "research" / "MU_MicronTechnology"
+            folder.mkdir(parents=True)
+            (folder / "routing.json").write_text(
+                json.dumps({"market_scope": "US_equity"}),
+                encoding="utf-8",
+            )
+            (folder / "investment-memo.md").write_text(
+                "# MU / Micron Technology 深度研究\n",
+                encoding="utf-8",
+            )
+            with patch.object(server, "MIRA_ROOT", root):
+                result = server.infer_object(folder)
+        self.assertEqual(result["ticker"], "MU.US")
+        self.assertEqual(server.infer_market(result["ticker"]), "美股")
+
     def test_explicit_us_equity_folder_suffix_is_normalized(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -154,6 +226,41 @@ class MarketAnalysisTests(unittest.TestCase):
         self.assertEqual(result["ticker"], "PLTR.US")
         self.assertEqual(result["name"], "Palantir")
         self.assertEqual(server.normalize_yahoo_symbol(result["ticker"], "美股"), "PLTR")
+
+    def test_build_object_library_files_merges_dynamic_and_curated_metadata(self):
+        path = "private/research/600276.SH_恒瑞医药/market-update-2026-07-06.md"
+        objects = [{
+            "files": [{
+                "title": "market-update-2026-07-06.md",
+                "type": "md",
+                "path": path,
+                "modifiedAt": 123.0,
+                "size": 456,
+            }],
+            "industryFiles": [{
+                "title": "创新药行业跟踪.pdf",
+                "type": "pdf",
+                "path": "行业资料/创新药行业跟踪.pdf",
+                "category": "industry_analysis",
+            }],
+        }]
+        curated = [{
+            "title": "market-update-2026-07-06.md",
+            "type": "行情更新",
+            "path": path,
+            "summary": "收盘后更新价格与趋势判断。",
+        }]
+
+        files = server.build_object_library_files(objects, curated)
+        by_path = {item["path"]: item for item in files}
+
+        self.assertEqual(by_path[path]["type"], "行情更新")
+        self.assertEqual(by_path[path]["modifiedAt"], 123.0)
+        self.assertEqual(by_path[path]["summary"], "收盘后更新价格与趋势判断。")
+        self.assertEqual(
+            by_path["行业资料/创新药行业跟踪.pdf"]["category"],
+            "industry_analysis",
+        )
 
     def test_tracked_etfs_have_a_separate_board_category(self):
         self.assertEqual(server.infer_market("588000.SH"), "ETF")
@@ -197,6 +304,29 @@ class MarketAnalysisTests(unittest.TestCase):
             payload = server.fetch_quote_snapshot("10011641", "期权")
         self.assertEqual(payload["provider"], "a_stock_data_sina_options")
         mocked.assert_called_once_with("10011641")
+
+    def test_option_quote_uses_mira_provider_surface(self):
+        surface = {
+            "provider": "sina_options",
+            "attempts": [
+                {"provider": "eastmoney", "status": "failed"},
+                {"provider": "sina_options", "status": "ok"},
+            ],
+            "records": [],
+            "rows": [{
+                "contract_code": "10011641", "underlying_code": "588000",
+                "last_price": 0.2538, "previous_close": 0.1944,
+                "bid_price": 0.2517, "ask_price": 0.2543,
+                "open_interest": 8587, "quote_time": "2026-07-03 15:00:00",
+                "vendor_source": "a_stock_data_sina_option_quote_and_greeks",
+            }],
+        }
+        with patch.object(server, "fetch_mira_option_surface", return_value=surface):
+            payload = server.fetch_option_quote_snapshot("10011641", underlying="588000")
+        self.assertEqual(payload["provider"], "mira_provider:sina_options")
+        self.assertTrue(payload["fallbackUsed"])
+        self.assertEqual(payload["sourceDate"], "2026-07-03")
+        self.assertEqual(payload["quality"]["level"], "good")
 
     def test_a_share_quote_prefers_eastmoney_without_calling_yahoo(self):
         eastmoney = {
@@ -403,6 +533,69 @@ class SafetyTests(unittest.TestCase):
             self.assertEqual(result["reason"], "market_not_closed")
             self.assertFalse(target.exists())
 
+    def test_overview_quote_archive_allows_last_completed_close_on_closed_day(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "overview-quotes.csv"
+            payload = {
+                "archiveDate": "2026-07-10",
+                "quotes": [{
+                    "symbol": "600276.SH", "market": "A股", "name": "恒瑞医药", "status": "ok",
+                    "price": 53.49, "sourceDate": "2026-07-10",
+                }],
+            }
+            closed_day_session = {
+                "archiveAllowed": True,
+                "autoRefreshAllowed": False,
+                "phase": "closed_day",
+                "expectedQuoteDate": "2026-07-10",
+            }
+            with (
+                patch.object(server, "OVERVIEW_QUOTES_PATH", target),
+                patch.object(server, "a_share_market_session", return_value=closed_day_session),
+            ):
+                result = server.archive_overview_quotes(payload)
+            self.assertEqual(result["status"], "ok")
+            self.assertTrue(target.exists())
+
+    def test_overview_quote_archive_preserves_csv_when_a_share_snapshot_is_incomplete(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "overview-quotes.csv"
+            payload = {
+                "archiveDate": "2026-07-10",
+                "quotes": [{
+                    "symbol": "600276.SH", "market": "A股", "name": "恒瑞医药", "status": "source_gap",
+                    "price": None, "sourceDate": "2026-07-09",
+                }],
+            }
+            closed_day_session = {"archiveAllowed": True, "phase": "closed_day", "expectedQuoteDate": "2026-07-10"}
+            with (
+                patch.object(server, "OVERVIEW_QUOTES_PATH", target),
+                patch.object(server, "a_share_market_session", return_value=closed_day_session),
+            ):
+                result = server.archive_overview_quotes(payload)
+            self.assertEqual(result["status"], "skipped")
+            self.assertEqual(result["reason"], "incomplete_a_share_snapshot")
+            self.assertFalse(target.exists())
+
+    def test_overview_quote_archive_rejects_lossy_chinese_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "overview-quotes.csv"
+            payload = {
+                "archiveDate": "2026-07-10",
+                "quotes": [{
+                    "symbol": "600276.SH", "market": "A?", "name": "????", "industry": "????",
+                    "status": "ok", "price": 53.49, "sourceDate": "2026-07-10",
+                }],
+            }
+            closed_day_session = {"archiveAllowed": True, "phase": "closed_day", "expectedQuoteDate": "2026-07-10"}
+            with (
+                patch.object(server, "OVERVIEW_QUOTES_PATH", target),
+                patch.object(server, "a_share_market_session", return_value=closed_day_session),
+            ):
+                with self.assertRaisesRegex(ValueError, "lossy text"):
+                    server.archive_overview_quotes(payload)
+            self.assertFalse(target.exists())
+
     def test_overview_quote_archive_rejects_non_close_date(self):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "overview-quotes.csv"
@@ -601,6 +794,50 @@ class SafetyTests(unittest.TestCase):
         self.assertIn("这部分内容必须保留", written)
         quote_fetch.assert_called_once_with("600000.SH", "A股")
 
+    def test_market_update_uses_latest_trading_day_on_weekend(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            folder = root / "private" / "research" / "600000.SH_测试公司"
+            folder.mkdir(parents=True)
+            history = [
+                {
+                    "date": f"2026-05-{(index % 28) + 1:02d}",
+                    "open": 10 + index * 0.1,
+                    "high": 10.3 + index * 0.1,
+                    "low": 9.8 + index * 0.1,
+                    "close": 10.1 + index * 0.1,
+                    "volume": 1000 + index,
+                }
+                for index in range(60)
+            ]
+            quote = {
+                "status": "ok",
+                "symbol": "600000.SH",
+                "market": "A股",
+                "provider": "eastmoney",
+                "price": history[-1]["close"],
+                "previousClose": history[-2]["close"],
+                "changePct": 0.63,
+                "currency": "CNY",
+                "volume": 2000,
+                "sourceDate": "2026-07-03",
+                "history": history,
+            }
+            with (
+                patch.object(server, "MIRA_ROOT", root),
+                patch.object(server, "RESEARCH_ROOT", root / "private" / "research"),
+                patch.object(server, "current_china_market_date", return_value=server._dt.date(2026, 7, 4)),
+                patch.object(server, "fetch_quote_snapshot", return_value=quote),
+            ):
+                preview = server.update_market_snapshot("600000.SH", "A股")
+
+        self.assertEqual(preview["status"], "preview")
+        self.assertEqual(preview["title"], "market-update-2026-07-03.md")
+        self.assertEqual(
+            preview["path"],
+            "private/research/600000.SH_测试公司/market-update-2026-07-03.md",
+        )
+
     def test_existing_monitor_skips_news_and_ai_workflow(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -756,6 +993,9 @@ class ApiIntegrationTests(unittest.TestCase):
             self.assertEqual(response.status, 200)
             self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
             self.assertEqual(response.headers["X-Frame-Options"], "DENY")
+            payload = json.load(response)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(len(payload["serverSourceHash"]), 64)
 
     def test_static_server_does_not_expose_backend_source(self):
         with self.assertRaises(urllib.error.HTTPError) as raised:
@@ -773,14 +1013,71 @@ class ApiIntegrationTests(unittest.TestCase):
             self.assertEqual(response.status, 200)
 
     def test_position_reviews_returns_200(self):
-        with self.request("/api/position-reviews") as response:
-            self.assertEqual(response.status, 200)
+        missing = {"status": "missing", "message": "尚未生成持仓复盘", "reviews": []}
+        with patch.object(server, "read_position_reviews", return_value=missing):
+            with self.request("/api/position-reviews") as response:
+                self.assertEqual(response.status, 200)
+                payload = json.load(response)
+        self.assertEqual(payload["status"], "missing")
+
+    def test_research_index_missing_is_business_status_200(self):
+        missing = {"status": "missing", "objects": []}
+        with patch.object(server, "scan_research_index", return_value=missing):
+            with self.request("/api/research-index") as response:
+                self.assertEqual(response.status, 200)
+                payload = json.load(response)
+        self.assertEqual(payload["status"], "missing")
 
     def test_market_session_returns_200(self):
         with self.request("/api/market-session") as response:
             payload = json.load(response)
         self.assertEqual(payload["status"], "ok")
         self.assertIn(payload["phase"], {"pre_open", "trading", "closed", "closed_day", "calendar_unknown"})
+
+    def test_read_layer_returns_versioned_contracts(self):
+        with self.request("/api/read/market-calendar") as response:
+            calendar = json.load(response)
+        self.assertEqual(calendar["contract"], {
+            "name": "miraboard.read.market-calendar",
+            "version": 1,
+            "layer": "read",
+        })
+        self.assertEqual(calendar["market"], "CN_A")
+
+        with self.request("/api/read/operations") as response:
+            operations = json.load(response)
+        self.assertEqual(operations["contract"]["name"], "miraboard.read.operations-catalog")
+        self.assertTrue(any(item["endpoint"].startswith("/api/ops/") for item in operations["operations"]))
+
+    def test_market_pulse_and_research_feed_are_read_only_contracts(self):
+        with patch.object(server, "read_market_pulse", return_value={"status": "source_gap", "items": []}):
+            with self.request("/api/read/market-pulse") as response:
+                pulse = json.load(response)
+        self.assertEqual(pulse["contract"]["name"], "miraboard.read.market-pulse")
+        self.assertEqual(pulse["status"], "source_gap")
+
+        with patch.object(server, "fetch_research_feed", return_value={"status": "source_gap", "items": []}):
+            with self.request("/api/read/research-feed?symbols=600276.SH") as response:
+                feed = json.load(response)
+        self.assertEqual(feed["contract"]["name"], "miraboard.read.research-feed")
+        self.assertEqual(feed["status"], "source_gap")
+
+    def test_controlled_operation_returns_versioned_contract(self):
+        data = json.dumps({}).encode("utf-8")
+        with self.assertRaises(urllib.error.HTTPError) as raised:
+            self.request(
+                "/api/ops/ai-config",
+                data=data,
+                headers={"Content-Type": "application/json"},
+            )
+        self.assertEqual(raised.exception.code, 400)
+        payload = json.load(raised.exception)
+        self.assertEqual(payload["contract"], {
+            "name": "miraboard.operation.result",
+            "version": 1,
+            "layer": "controlled-operation",
+        })
+        self.assertEqual(payload["operation"], "ai-config")
 
     def test_missing_source_returns_404(self):
         with self.assertRaises(urllib.error.HTTPError) as raised:
@@ -793,6 +1090,14 @@ class ApiIntegrationTests(unittest.TestCase):
                 "/api/ai-config",
                 data=b"{}",
                 headers={"Content-Type": "application/json", "Origin": "https://evil.example"},
+            )
+        self.assertEqual(raised.exception.code, 403)
+
+    def test_cross_origin_get_returns_403(self):
+        with self.assertRaises(urllib.error.HTTPError) as raised:
+            self.request(
+                "/api/health",
+                headers={"Origin": "https://evil.example", "Sec-Fetch-Site": "cross-site"},
             )
         self.assertEqual(raised.exception.code, 403)
 

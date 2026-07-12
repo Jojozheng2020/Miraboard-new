@@ -35,6 +35,7 @@
 - Use plain JavaScript, plain CSS, and Python standard library patterns already present in the repo.
 - Preserve the local-first, read-only prototype model: API failures must fall back gracefully to `data/bootstrap.json` or embedded client data.
 - Preserve UTF-8 encoding. Do not introduce new mojibake or widen existing encoding damage.
+- Treat `Asia/Shanghai` as the only clock for market dates, quote freshness, refresh windows, archives, and displayed refresh times. Never derive these from the host PC timezone.
 - In `server.py`, keep API responses JSON-shaped and explicit; validate paths before reading files.
 - In `app.js`, prefer small helpers and existing render/update patterns over new frameworks or large abstractions.
 - In `styles.css`, keep controls compact, information-dense, and consistent with the existing dashboard visual language.

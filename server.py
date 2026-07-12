@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
-import ipaddress
+import math
 import mimetypes
 import os
 import re
 import secrets
-import socket
 import subprocess
 import sys
 import threading
@@ -21,8 +21,18 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
+from server_security import (
+    NoAiRedirectHandler,
+    ai_chat_completions_url,
+    is_trusted_local_request,
+    resolve_within,
+    validate_ai_base_url,
+)
+from api_contracts import validate_contract_payload, with_operation_contract, with_read_contract
+
 
 APP_ROOT = Path(__file__).resolve().parent
+SERVER_SOURCE_HASH = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 DEFAULT_MIRA_ROOT = APP_ROOT.parent / "Mira"
 MIRA_ROOT = Path(os.environ.get("MIRABOARD_MIRA_ROOT", DEFAULT_MIRA_ROOT)).resolve()
 RESEARCH_ROOT = MIRA_ROOT / "private" / "research"
@@ -32,8 +42,21 @@ PORTFOLIO_POSITIONS_PATH = APP_ROOT / "data" / "portfolio-daily-positions.csv"
 PORTFOLIO_ARCHIVE_LOCK = threading.Lock()
 OVERVIEW_QUOTES_PATH = APP_ROOT / "data" / "overview-quotes.csv"
 OVERVIEW_QUOTES_LOCK = threading.Lock()
+QUOTE_BATCH_SEMAPHORE = threading.BoundedSemaphore(2)
+OPTION_SURFACE_LOCK = threading.Lock()
+OPTION_SURFACE_CACHE: dict[str, dict] = {}
+OPTION_SURFACE_TTL_SECONDS = 15
 OVERVIEW_HISTORY_PATH = APP_ROOT / "data" / "overview-price-history.csv"
 OVERVIEW_HISTORY_LOCK = threading.Lock()
+MARKET_CALENDAR_PATH = APP_ROOT / "data" / "a-share-market-calendar.json"
+MARKET_CALENDAR_LOCK = threading.Lock()
+MARKET_CALENDAR_CACHE: dict[str, object] = {"mtime": None, "payload": None}
+MARKET_PULSE_LOCK = threading.Lock()
+MARKET_PULSE_CACHE: dict[str, object] = {"cached_at": 0.0, "payload": None}
+MARKET_PULSE_TTL_SECONDS = 120
+RESEARCH_FEED_LOCK = threading.Lock()
+RESEARCH_FEED_CACHE: dict[tuple[str, ...], dict] = {}
+RESEARCH_FEED_TTL_SECONDS = 10 * 60
 TUSHARE_HISTORY_ADAPTER_PATH = APP_ROOT / "tushare_history_adapter.py"
 _LOCAL_TUSHARE_PYTHON = APP_ROOT / ".tushare-runtime" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
 TUSHARE_PYTHON = os.environ.get(
@@ -61,6 +84,18 @@ TEXT_SUFFIXES = {".md", ".txt", ".csv", ".json", ".html"}
 LIBRARY_SUFFIXES = {".md", ".txt", ".csv", ".json", ".html", ".pdf", ".xlsx"}
 MAX_TEXT_PREVIEW_CHARS = 1_000_000
 YAHOO_CHART_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=3mo"
+FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}"
+MARKET_PULSE_FRED_SERIES = (
+    ("us_2y", "美债 2Y", "DGS2"),
+    ("us_10y", "美债 10Y", "DGS10"),
+    ("us_30y", "美债 30Y", "DGS30"),
+)
+MARKET_PULSE_YAHOO_SERIES = (
+    ("usd_cny", "美元/人民币", "CNY=X"),
+    ("usd_jpy", "美元/日元", "JPY=X"),
+    ("usd_hkd", "美元/港元", "HKD=X"),
+    ("dxy", "美元指数 DXY", "DX-Y.NYB"),
+)
 SINA_OPTION_QUOTE_URL = "https://hq.sinajs.cn/list={symbols}"
 SINA_OPTION_REFERER = "https://stock.finance.sina.com.cn/"
 STOCK_API_ADAPTER_PATH = APP_ROOT / "stock_api_adapter.mjs"
@@ -77,18 +112,72 @@ SINA_OPTION_HEADERS = {
     "Referer": SINA_OPTION_REFERER,
 }
 CHINA_TIMEZONE = _dt.timezone(_dt.timedelta(hours=8))
-# 上海证券交易所 2026 年节假日休市安排（上证公告〔2025〕45号）。
-A_SHARE_HOLIDAY_RANGES = {
-    2026: (
-        (_dt.date(2026, 1, 1), _dt.date(2026, 1, 3)),
-        (_dt.date(2026, 2, 15), _dt.date(2026, 2, 23)),
-        (_dt.date(2026, 4, 4), _dt.date(2026, 4, 6)),
-        (_dt.date(2026, 5, 1), _dt.date(2026, 5, 5)),
-        (_dt.date(2026, 6, 19), _dt.date(2026, 6, 21)),
-        (_dt.date(2026, 9, 25), _dt.date(2026, 9, 27)),
-        (_dt.date(2026, 10, 1), _dt.date(2026, 10, 7)),
-    ),
-}
+
+
+def json_safe_value(value):
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {key: json_safe_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [json_safe_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [json_safe_value(item) for item in value]
+    return value
+
+
+def china_now() -> _dt.datetime:
+    return _dt.datetime.now(_dt.timezone.utc).astimezone(CHINA_TIMEZONE)
+
+
+def china_now_iso(*, timespec: str = "seconds") -> str:
+    return china_now().isoformat(timespec=timespec)
+
+
+def china_date_iso() -> str:
+    return china_now().date().isoformat()
+
+
+def read_market_calendar() -> dict:
+    """Read the single shared A-share calendar with a mtime-aware cache."""
+    try:
+        mtime = MARKET_CALENDAR_PATH.stat().st_mtime_ns
+    except OSError:
+        return {"status": "missing", "message": "market calendar file is unavailable", "years": {}}
+    with MARKET_CALENDAR_LOCK:
+        if MARKET_CALENDAR_CACHE["mtime"] == mtime and isinstance(MARKET_CALENDAR_CACHE["payload"], dict):
+            return dict(MARKET_CALENDAR_CACHE["payload"])
+        try:
+            payload = json.loads(MARKET_CALENDAR_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            payload = {"status": "error", "message": "market calendar file is invalid", "years": {}}
+        if not isinstance(payload, dict) or not isinstance(payload.get("years"), dict):
+            payload = {"status": "error", "message": "market calendar requires a years object", "years": {}}
+        else:
+            payload = {"status": "ok", **payload}
+        MARKET_CALENDAR_CACHE["mtime"] = mtime
+        MARKET_CALENDAR_CACHE["payload"] = payload
+        return dict(payload)
+
+
+def a_share_holiday_ranges(year: int) -> tuple[tuple[_dt.date, _dt.date], ...] | None:
+    calendar = read_market_calendar()
+    raw_ranges = (calendar.get("years") or {}).get(str(year))
+    if not isinstance(raw_ranges, list):
+        return None
+    ranges = []
+    for item in raw_ranges:
+        if not isinstance(item, list) or len(item) != 2:
+            return None
+        try:
+            start = _dt.date.fromisoformat(str(item[0]))
+            end = _dt.date.fromisoformat(str(item[1]))
+        except ValueError:
+            return None
+        if end < start:
+            return None
+        ranges.append((start, end))
+    return tuple(ranges)
 AI_CONFIG_LOCK = threading.Lock()
 AI_CONFIG = {
     "provider": "OpenAI 兼容接口",
@@ -108,30 +197,76 @@ MARKET_UPDATE_RULE_PATH = MIRA_ROOT / "data" / "monitoring-file-boundary.md"
 MONITORING_LOOP_PATH = MIRA_ROOT / "loops" / "monitoring-loop.md"
 THESIS_UPDATE_LOOP_PATH = MIRA_ROOT / "loops" / "thesis-update-loop.md"
 ETF_TICKERS = {"588000.SH", "159992.SZ"}
+CONTROLLED_OPERATIONS = (
+    {
+        "id": "market-update",
+        "endpoint": "/api/ops/update-market",
+        "effect": "writes_confirmed_mira_market_update",
+        "requiresConfirmation": True,
+        "target": "Mira/private/research/<object>/market-update-YYYY-MM-DD.md",
+    },
+    {
+        "id": "industry-news-update",
+        "endpoint": "/api/ops/update-news",
+        "effect": "writes_confirmed_mira_monitoring_update",
+        "requiresConfirmation": True,
+        "target": "Mira/private/research/<object>/monitoring-update-YYYY-MM-DD.md",
+    },
+    {
+        "id": "ai-config",
+        "endpoint": "/api/ops/ai-config",
+        "effect": "updates_process_memory_only",
+        "requiresConfirmation": False,
+        "target": "MiraBoard process memory; API key is never returned",
+    },
+    {
+        "id": "ai-test",
+        "endpoint": "/api/ops/ai-test",
+        "effect": "external_connection_test",
+        "requiresConfirmation": False,
+        "target": "configured AI endpoint",
+    },
+    {
+        "id": "portfolio-archive",
+        "endpoint": "/api/ops/portfolio-archive",
+        "effect": "writes_miraboard_portfolio_csv",
+        "requiresConfirmation": False,
+        "target": "MiraBoard/data/portfolio-*.csv",
+    },
+    {
+        "id": "overview-quotes-archive",
+        "endpoint": "/api/ops/overview-quotes-archive",
+        "effect": "writes_miraboard_quote_archive",
+        "requiresConfirmation": False,
+        "target": "MiraBoard/data/overview-quotes.csv",
+    },
+    {
+        "id": "overview-history-refresh",
+        "endpoint": "/api/ops/overview-history-refresh",
+        "effect": "requests_history_then_writes_miraboard_csv",
+        "requiresConfirmation": False,
+        "target": "MiraBoard/data/overview-price-history.csv",
+    },
+)
 PUBLIC_STATIC_PATHS = {
     "/",
     "/index.html",
     "/app.js",
     "/styles.css",
+    "/frontend_security.js",
+    "/frontend_contracts.js",
+    "/frontend_cache.js",
+    "/data_utils.js",
+    "/markdown_renderer.js",
     "/option_math.js",
     "/data/bootstrap.json",
+    "/data/a-share-market-calendar.json",
     "/data/portfolio-daily.csv",
     "/data/portfolio-transactions.csv",
     "/data/portfolio-daily-positions.csv",
     "/data/overview-quotes.csv",
     "/data/overview-price-history.csv",
 }
-
-
-def resolve_within(path: Path, root: Path, *, strict: bool = False) -> Path | None:
-    """Resolve a path and reject traversal or symlink escapes from root."""
-    try:
-        resolved_root = root.resolve(strict=False)
-        resolved = path.resolve(strict=strict)
-        resolved.relative_to(resolved_root)
-        return resolved
-    except (OSError, RuntimeError, ValueError):
-        return None
 
 
 def is_safe_mira_path(path: Path, *, strict: bool = False) -> bool:
@@ -142,6 +277,14 @@ def is_public_static_path(path: str) -> bool:
     if path in PUBLIC_STATIC_PATHS:
         return True
     return path.startswith("/assets/") and ".." not in Path(path).parts
+
+
+def controlled_operations_catalog() -> dict:
+    return {
+        "status": "ok",
+        "layer": "controlled-operation",
+        "operations": [dict(item) for item in CONTROLLED_OPERATIONS],
+    }
 
 
 def file_fingerprint(path: Path) -> tuple[bool, int | None, int | None]:
@@ -196,7 +339,7 @@ def register_write_preview(kind: str, ticker: str, target: Path, text: str, resp
         "previewExpiresAt": _dt.datetime.fromtimestamp(
             now + WRITE_PREVIEW_TTL_SECONDS,
             tz=_dt.timezone.utc,
-        ).isoformat(),
+        ).astimezone(CHINA_TIMEZONE).isoformat(),
         "document": build_preview_document(target, text),
     }
 
@@ -367,37 +510,6 @@ def save_ai_config(payload: dict) -> dict:
     return {"status": "ok", "message": "设置已保存", "config": public_ai_config()}
 
 
-def validate_ai_base_url(base_url: str) -> str:
-    if not base_url:
-        return "请填写 API 地址"
-    parsed = urlparse(base_url)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        return "API 地址必须是有效的 http(s) URL"
-    if parsed.scheme == "http" and parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-        return "远程接口必须使用 HTTPS；HTTP 仅允许本机模型"
-    if parsed.username or parsed.password:
-        return "API 地址不能包含用户名或密码"
-    if parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-        try:
-            addresses = {item[4][0] for item in socket.getaddrinfo(parsed.hostname, parsed.port or 443)}
-        except socket.gaierror:
-            return "API 地址无法解析"
-        for address in addresses:
-            if not ipaddress.ip_address(address).is_global:
-                return "远程 API 地址不能指向本机、内网或保留地址"
-    return ""
-
-
-def ai_chat_completions_url(base_url: str) -> str:
-    base = base_url.rstrip("/")
-    return base if base.endswith("/chat/completions") else f"{base}/chat/completions"
-
-
-class NoAiRedirectHandler(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
-
-
 def test_ai_connection() -> dict:
     with AI_CONFIG_LOCK:
         config = dict(AI_CONFIG)
@@ -452,7 +564,7 @@ def update_ai_test_status(
         AI_CONFIG.update({
             "status": status,
             "message": message,
-            "testedAt": _dt.datetime.now().isoformat(timespec="seconds"),
+            "testedAt": china_now_iso(),
             "latencyMs": latency_ms,
         })
 
@@ -603,14 +715,14 @@ def write_ai_document(target: Path, markdown: str) -> None:
 
 
 def safe_stat(path: Path) -> dict:
-  try:
-    stat = path.stat()
-    return {
-      "size": stat.st_size,
-      "modifiedAt": stat.st_mtime,
-    }
-  except OSError:
-    return {"size": None, "modifiedAt": None}
+    try:
+        stat = path.stat()
+        return {
+            "size": stat.st_size,
+            "modifiedAt": stat.st_mtime,
+        }
+    except OSError:
+        return {"size": None, "modifiedAt": None}
 
 
 def safe_children(path: Path) -> list[Path]:
@@ -675,112 +787,155 @@ def infer_routed_us_ticker(folder: Path) -> str:
         routing = json.loads(routing_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return ""
-    market_scope = str(routing.get("market_scope") or "").lower()
+    # Routing cards use both prose labels ("US equities") and canonical
+    # machine labels ("US_equity").  Normalize separators before detecting
+    # the market so either form indexes the research object consistently.
+    market_scope = re.sub(r"[_-]+", " ", str(routing.get("market_scope") or "").lower())
     if not any(marker in market_scope for marker in ("us equit", "nasdaq", "nyse")):
         return ""
     return f"{match.group('ticker').upper()}.US"
 
 
 def infer_object(folder: Path) -> dict:
-  name = folder.name
-  ticker = ""
-  display_name = name
-  if name.startswith("大宗商品_"):
-    ticker, display_name = name.split("_", 1)
-  else:
-    stock_match = STOCK_FOLDER_PATTERN.fullmatch(name)
-    us_stock_match = US_STOCK_FOLDER_PATTERN.fullmatch(name)
-    if stock_match:
-      ticker = stock_match.group("ticker").upper()
-      display_name = stock_match.group("name") or infer_name_from_research_files(folder, ticker)
-    elif us_stock_match:
-      ticker = re.sub(r"\.(?:NASDAQ|NYSE)$", ".US", us_stock_match.group("ticker").upper())
-      display_name = us_stock_match.group("name") or infer_name_from_research_files(folder, ticker)
+    name = folder.name
+    ticker = ""
+    display_name = name
+    if name.startswith("大宗商品_"):
+        ticker, display_name = name.split("_", 1)
     else:
-      routed_ticker = infer_routed_us_ticker(folder)
-      if routed_ticker:
-        ticker = routed_ticker
-        display_name = infer_name_from_research_files(folder, ticker)
+        stock_match = STOCK_FOLDER_PATTERN.fullmatch(name)
+        us_stock_match = US_STOCK_FOLDER_PATTERN.fullmatch(name)
+        if stock_match:
+            ticker = stock_match.group("ticker").upper()
+            display_name = stock_match.group("name") or infer_name_from_research_files(folder, ticker)
+        elif us_stock_match:
+            ticker = re.sub(r"\.(?:NASDAQ|NYSE)$", ".US", us_stock_match.group("ticker").upper())
+            display_name = us_stock_match.group("name") or infer_name_from_research_files(folder, ticker)
+        else:
+            routed_ticker = infer_routed_us_ticker(folder)
+            if routed_ticker:
+                ticker = routed_ticker
+                display_name = infer_name_from_research_files(folder, ticker)
 
-  files = []
-  for child in sorted(safe_children(folder), key=lambda item: item.name.lower()):
-    if not child.is_file():
-      continue
-    if not is_safe_mira_path(child):
-      continue
-    if child.suffix.lower() not in {".md", ".pdf", ".csv", ".xlsx", ".html"}:
-      continue
-    rel_path = child.relative_to(MIRA_ROOT).as_posix()
-    files.append({
-      "title": child.name,
-      "type": child.suffix.lower().lstrip(".") or "file",
-      "path": rel_path,
-      **safe_stat(child),
-    })
+    files = []
+    for child in sorted(safe_children(folder), key=lambda item: item.name.lower()):
+        if not child.is_file():
+            continue
+        if not is_safe_mira_path(child):
+            continue
+        if child.suffix.lower() not in {".md", ".pdf", ".csv", ".xlsx", ".html"}:
+            continue
+        rel_path = child.relative_to(MIRA_ROOT).as_posix()
+        files.append({
+            "title": child.name,
+            "type": child.suffix.lower().lstrip(".") or "file",
+            "path": rel_path,
+            **safe_stat(child),
+        })
 
-  return {
-    "id": name,
-    "ticker": ticker,
-    "name": display_name,
-    "path": folder.relative_to(MIRA_ROOT).as_posix(),
-    "fileCount": len(files),
-    "latestModifiedAt": max((item["modifiedAt"] or 0 for item in files), default=None),
-    "files": files[:30],
-  }
+    return {
+        "id": name,
+        "ticker": ticker,
+        "name": display_name,
+        "path": folder.relative_to(MIRA_ROOT).as_posix(),
+        "fileCount": len(files),
+        "latestModifiedAt": max((item["modifiedAt"] or 0 for item in files), default=None),
+        "files": files[:30],
+    }
 
 
 def infer_market(ticker: str, object_id: str = "") -> str:
-  ticker = ticker.upper()
-  if ticker in ETF_TICKERS:
-    return "ETF"
-  if ticker.endswith((".SH", ".SZ", ".BJ")):
-    return "A股"
-  if ticker.endswith(".HK"):
-    return "港股"
-  if ticker.endswith((".US", ".NASDAQ", ".NYSE")):
-    return "美股"
-  if object_id.startswith("大宗商品_"):
-    return "大宗商品"
-  return "行业分析"
+    ticker = ticker.upper()
+    if ticker in ETF_TICKERS:
+        return "ETF"
+    if ticker.endswith((".SH", ".SZ", ".BJ")):
+        return "A股"
+    if ticker.endswith(".HK"):
+        return "港股"
+    if ticker.endswith((".US", ".NASDAQ", ".NYSE")):
+        return "美股"
+    if object_id.startswith("大宗商品_"):
+        return "大宗商品"
+    return "行业分析"
 
 
 def infer_refresh_state(latest_modified_at: float | None) -> str:
-  if not latest_modified_at:
-    return "needs_refresh"
-  age = time.time() - latest_modified_at
-  if age <= FRESH_SECONDS:
-    return "fresh"
-  if age <= STALE_SECONDS:
-    return "needs_refresh"
-  return "stale"
+    if not latest_modified_at:
+        return "needs_refresh"
+    age = time.time() - latest_modified_at
+    if age <= FRESH_SECONDS:
+        return "fresh"
+    if age <= STALE_SECONDS:
+        return "needs_refresh"
+    return "stale"
 
 
 def to_board_object(index_object: dict) -> dict:
-  latest_modified_at = index_object.get("latestModifiedAt")
-  stale = infer_refresh_state(latest_modified_at)
-  file_count = index_object.get("fileCount", 0)
-  trend = extract_latest_market_update_trend(index_object)
-  folder_path = index_object.get("path", "")
-  folder = (MIRA_ROOT / folder_path).resolve() if folder_path else None
-  evidence_quality = score_evidence_quality(folder) if folder else empty_evidence_quality()
-  return {
-    "ticker": index_object.get("ticker", ""),
-    "name": index_object.get("name") or index_object.get("id", ""),
-    "market": infer_market(index_object.get("ticker", ""), index_object.get("id", "")),
-    "price": "待接入",
-    "change": "",
-    "trend": trend.get("trend", ""),
-    "trendSource": trend.get("source", ""),
-    "trendSourceModifiedAt": trend.get("modifiedAt"),
-    "state": "indexed",
-    "stale": stale,
-    "color": "green" if stale == "fresh" else "amber" if stale == "needs_refresh" else "red",
-    "path": index_object.get("path", ""),
-    "fileCount": file_count,
-    "latestModifiedAt": latest_modified_at,
-    "files": index_object.get("files", []),
-    "evidenceQuality": evidence_quality,
-  }
+    latest_modified_at = index_object.get("latestModifiedAt")
+    stale = infer_refresh_state(latest_modified_at)
+    file_count = index_object.get("fileCount", 0)
+    trend = extract_latest_market_update_trend(index_object)
+    folder_path = index_object.get("path", "")
+    folder = (MIRA_ROOT / folder_path).resolve() if folder_path else None
+    evidence_quality = score_evidence_quality(folder) if folder else empty_evidence_quality()
+    return {
+        "ticker": index_object.get("ticker", ""),
+        "name": index_object.get("name") or index_object.get("id", ""),
+        "market": infer_market(index_object.get("ticker", ""), index_object.get("id", "")),
+        "price": "待接入",
+        "change": "",
+        "trend": trend.get("trend", ""),
+        "trendSource": trend.get("source", ""),
+        "trendSourceModifiedAt": trend.get("modifiedAt"),
+        "state": "indexed",
+        "stale": stale,
+        "color": "green" if stale == "fresh" else "amber" if stale == "needs_refresh" else "red",
+        "path": index_object.get("path", ""),
+        "fileCount": file_count,
+        "latestModifiedAt": latest_modified_at,
+        "files": index_object.get("files", []),
+        "evidenceQuality": evidence_quality,
+    }
+
+
+def merge_file_metadata(existing: dict | None, incoming: dict | None) -> dict:
+    merged = dict(existing or {})
+    for key, value in (incoming or {}).items():
+        if key not in merged:
+            merged[key] = value
+            continue
+        if value in (None, "", []):
+            continue
+        if merged.get(key) in (None, "", []):
+            merged[key] = value
+            continue
+        if key in {"type", "summary", "date", "category", "industryAnalysis", "modifiedAt", "size"}:
+            merged[key] = value
+    return merged
+
+
+def build_object_library_files(objects: list[dict], curated_files: list[dict] | None = None) -> list[dict]:
+    merged: dict[str, dict] = {}
+    for item in objects:
+        for file in [*(item.get("files") or []), *(item.get("industryFiles") or [])]:
+            path = str(file.get("path") or "")
+            if not path:
+                continue
+            merged[path] = merge_file_metadata(merged.get(path), file)
+
+    for file in curated_files or []:
+        path = str(file.get("path") or "")
+        if not path:
+            continue
+        merged[path] = merge_file_metadata(merged.get(path), file)
+
+    return sorted(
+        merged.values(),
+        key=lambda item: (
+            str(item.get("path") or "").lower(),
+            str(item.get("title") or "").lower(),
+        ),
+    )
 
 
 EVIDENCE_CATEGORIES = (
@@ -949,81 +1104,81 @@ def average(values: list[float]) -> float:
 
 
 def extract_latest_market_update_trend(index_object: dict) -> dict:
-  folder_path = index_object.get("path", "")
-  folder = (MIRA_ROOT / folder_path).resolve() if folder_path else None
-  try:
-    if not folder or not folder.is_dir() or not folder.relative_to(MIRA_ROOT):
-      return {}
-  except ValueError:
-    return {}
+    folder_path = index_object.get("path", "")
+    folder = (MIRA_ROOT / folder_path).resolve() if folder_path else None
+    try:
+        if not folder or not folder.is_dir() or not folder.relative_to(MIRA_ROOT):
+            return {}
+    except ValueError:
+        return {}
 
-  candidates = sorted(
-      (path for path in folder.glob("*market-update*.md") if is_safe_mira_path(path)),
-      key=safe_mtime,
-      reverse=True,
-  )
-  if not candidates:
-    return {}
-  source = candidates[0]
-  text = source.read_text(encoding="utf-8", errors="replace")
-  trend = parse_market_update_trend(text)
-  return {
-      "trend": trend,
-      "source": source.relative_to(MIRA_ROOT).as_posix(),
-      "modifiedAt": safe_mtime(source),
-  } if trend else {
-      "source": source.relative_to(MIRA_ROOT).as_posix(),
-      "modifiedAt": safe_mtime(source),
-  }
+    candidates = sorted(
+            (path for path in folder.glob("*market-update*.md") if is_safe_mira_path(path)),
+            key=safe_mtime,
+            reverse=True,
+    )
+    if not candidates:
+        return {}
+    source = candidates[0]
+    text = source.read_text(encoding="utf-8", errors="replace")
+    trend = parse_market_update_trend(text)
+    return {
+            "trend": trend,
+            "source": source.relative_to(MIRA_ROOT).as_posix(),
+            "modifiedAt": safe_mtime(source),
+    } if trend else {
+            "source": source.relative_to(MIRA_ROOT).as_posix(),
+            "modifiedAt": safe_mtime(source),
+    }
 
 
 def parse_market_update_trend(text: str) -> str:
-  lines = [line.strip().strip("|") for line in text.splitlines()]
-  in_judgment = False
-  for line in lines:
-    clean = re.sub(r"\s+", " ", line).strip()
-    heading = clean.lstrip("#").strip()
-    if re.match(r"^(judgment|判断|走势判断|核心判断)\s*[:：]?$", heading, re.I):
-      in_judgment = True
-      continue
-    if in_judgment:
-      if not clean:
-        continue
-      if clean.startswith("#"):
-        break
-      if clean.startswith("- "):
-        return clean_trend_text(clean[2:])
-      return clean_trend_text(clean)
+    lines = [line.strip().strip("|") for line in text.splitlines()]
+    in_judgment = False
+    for line in lines:
+        clean = re.sub(r"\s+", " ", line).strip()
+        heading = clean.lstrip("#").strip()
+        if re.match(r"^(judgment|判断|走势判断|核心判断)\s*[:：]?$", heading, re.I):
+            in_judgment = True
+            continue
+        if in_judgment:
+            if not clean:
+                continue
+            if clean.startswith("#"):
+                break
+            if clean.startswith("- "):
+                return clean_trend_text(clean[2:])
+            return clean_trend_text(clean)
 
-  patterns = [
-      re.compile(r"趋势判断\s*[|:：]\s*(.+)"),
-      re.compile(r"趋势状态\s*[|:：]\s*(.+)"),
-      re.compile(r"短线状态\s*[|:：]\s*(.+)"),
-      re.compile(r"Mira technical state\s*[|:：]\s*(.+)", re.I),
-      re.compile(r"^[-*]?\s*judgment\s*[|:：]\s*[`“\"]?(.+?)[`”\"]?$", re.I),
-  ]
-  for line in lines:
-    clean = re.sub(r"\s+", " ", line).strip()
-    for pattern in patterns:
-      match = pattern.search(clean)
-      if match:
-        return clean_trend_text(match.group(1))
+    patterns = [
+            re.compile(r"趋势判断\s*[|:：]\s*(.+)"),
+            re.compile(r"趋势状态\s*[|:：]\s*(.+)"),
+            re.compile(r"短线状态\s*[|:：]\s*(.+)"),
+            re.compile(r"Mira technical state\s*[|:：]\s*(.+)", re.I),
+            re.compile(r"^[-*]?\s*judgment\s*[|:：]\s*[`“\"]?(.+?)[`”\"]?$", re.I),
+    ]
+    for line in lines:
+        clean = re.sub(r"\s+", " ", line).strip()
+        for pattern in patterns:
+            match = pattern.search(clean)
+            if match:
+                return clean_trend_text(match.group(1))
 
-  for line in lines:
-    clean = re.sub(r"\s+", " ", line).strip()
-    if any(key in clean for key in ("趋势状态", "趋势判断", "更新结论", "短线状态")):
-      sentence = re.split(r"[。；;]", clean, maxsplit=1)[0]
-      return clean_trend_text(sentence)
-  return ""
+    for line in lines:
+        clean = re.sub(r"\s+", " ", line).strip()
+        if any(key in clean for key in ("趋势状态", "趋势判断", "更新结论", "短线状态")):
+            sentence = re.split(r"[。；;]", clean, maxsplit=1)[0]
+            return clean_trend_text(sentence)
+    return ""
 
 
 def clean_trend_text(value: str) -> str:
-  value = re.sub(r"<[^>]+>", " ", value)
-  value = value.strip().strip("`*_# ：:|")
-  value = re.split(r"\s+\|\s+", value)[0].strip()
-  value = re.sub(r"^(judgment|判断|趋势判断|趋势状态|短线状态|更新结论)\s*[:：]?\s*", "", value, flags=re.I)
-  value = value.strip().strip("`*_# ：:|")
-  return value[:120]
+    value = re.sub(r"<[^>]+>", " ", value)
+    value = value.strip().strip("`*_# ：:|")
+    value = re.split(r"\s+\|\s+", value)[0].strip()
+    value = re.sub(r"^(judgment|判断|趋势判断|趋势状态|短线状态|更新结论)\s*[:：]?\s*", "", value, flags=re.I)
+    value = value.strip().strip("`*_# ：:|")
+    return value[:120]
 
 
 def is_quote_candidate(ticker: str, market: str = "") -> bool:
@@ -1059,10 +1214,13 @@ def normalize_yahoo_symbol(ticker: str, market: str = "") -> str:
     return raw
 
 
-def fetch_quote_snapshot(ticker: str, market: str = "") -> dict:
+def fetch_quote_snapshot(ticker: str, market: str = "", underlying: str = "") -> dict:
     raw_ticker = (ticker or "").strip().upper()
     if re.fullmatch(r"\d{8}", raw_ticker):
-        return fetch_option_quote_snapshot(raw_ticker)
+        return (
+            fetch_option_quote_snapshot(raw_ticker, underlying=underlying)
+            if underlying else fetch_option_quote_snapshot(raw_ticker)
+        )
     normalized_market = normalize_market_arg(ticker, market)
     if normalized_market == "A股":
         primary = fetch_eastmoney_quote_snapshot(ticker, normalized_market)
@@ -1209,7 +1367,7 @@ def fetch_eastmoney_quote_snapshot(ticker: str, market: str = "A股") -> dict:
             "history": history,
             "miraLevels": extract_mira_price_levels(ticker, price),
             "sourceDate": source_date,
-            "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+            "asOf": china_now_iso(),
             "url": source_url,
             "providerAttempts": [{"provider": "eastmoney", "status": "ok", "message": ""}],
         })
@@ -1296,7 +1454,7 @@ def fetch_stock_api_quote_snapshot(ticker: str, market: str = "A股") -> dict:
             "history": history,
             "miraLevels": extract_mira_price_levels(ticker, price),
             "sourceDate": source_date,
-            "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+            "asOf": china_now_iso(),
             "url": "https://github.com/zhangxiangliang/stock-api",
         })
     except (OSError, subprocess.SubprocessError, json.JSONDecodeError, TypeError, ValueError) as exc:
@@ -1334,9 +1492,9 @@ def fetch_yahoo_quote_snapshot(ticker: str, market: str = "") -> dict:
             change_pct = change / previous * 100
         quote_time = meta.get("regularMarketTime")
         source_date = (
-            _dt.datetime.fromtimestamp(quote_time).date().isoformat()
+            _dt.datetime.fromtimestamp(quote_time, tz=_dt.timezone.utc).astimezone(CHINA_TIMEZONE).date().isoformat()
             if isinstance(quote_time, (int, float))
-            else _dt.date.today().isoformat()
+            else china_date_iso()
         )
         quote = {
             "status": "ok",
@@ -1353,7 +1511,7 @@ def fetch_yahoo_quote_snapshot(ticker: str, market: str = "") -> dict:
             "history": history,
             "miraLevels": extract_mira_price_levels(ticker, price),
             "sourceDate": source_date,
-            "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+            "asOf": china_now_iso(),
             "url": url,
         }
         return merge_eastmoney_quote_metadata(ticker, quote) if market == "A股" else quote
@@ -1375,10 +1533,148 @@ def infer_previous_close(meta: dict, history: list[dict]) -> float | None:
     return None
 
 
-def fetch_option_quote_snapshot(contract_code: str) -> dict:
+def fetch_mira_option_surface(underlying: str) -> dict:
+    code = str(underlying or "").strip()
+    if not re.fullmatch(r"\d{6}", code):
+        raise ValueError("option underlying is required")
+    now = time.monotonic()
+    with OPTION_SURFACE_LOCK:
+        cached = OPTION_SURFACE_CACHE.get(code)
+        if cached and now - cached["cached_at"] < OPTION_SURFACE_TTL_SECONDS:
+            return cached["payload"]
+
+        tools_path = MIRA_ROOT / "tools"
+        if not tools_path.is_dir():
+            raise RuntimeError("Mira tools/mira_data is unavailable")
+        tools_value = str(tools_path)
+        if tools_value not in sys.path:
+            sys.path.insert(0, tools_value)
+        from mira_data.market import route_a_share_option_chain
+
+        routed = route_a_share_option_chain(code)
+        rows = ((routed.result.series or {}).get("rows") or [])
+        provider = routed.provider
+        attempts = list(routed.attempts)
+        if routed.provider == "eastmoney":
+            try:
+                supplement = route_a_share_option_chain(code, providers=("sina_options",))
+                supplement_rows = {
+                    str(row.get("contract_code") or ""): row
+                    for row in ((supplement.result.series or {}).get("rows") or [])
+                }
+                rows = [
+                    {
+                        **row,
+                        **{
+                            key: value for key, value in supplement_rows.get(str(row.get("contract_code") or ""), {}).items()
+                            if value not in (None, "")
+                        },
+                    }
+                    for row in rows
+                ]
+                provider = "eastmoney+sina_options"
+                attempts.extend(supplement.attempts)
+            except Exception as exc:
+                attempts.append({"provider": "sina_options", "status": "failed", "error": str(exc)[:180]})
+        payload = {
+            "provider": provider,
+            "attempts": attempts,
+            "rows": rows,
+            "records": routed.result.records,
+        }
+        OPTION_SURFACE_CACHE[code] = {"cached_at": time.monotonic(), "payload": payload}
+        return payload
+
+
+def option_quote_quality(row: dict) -> dict:
+    flags = []
+    bid = row.get("bid_price")
+    ask = row.get("ask_price")
+    if not isinstance(bid, (int, float)) or not isinstance(ask, (int, float)):
+        flags.append("missing_bid_ask")
+    elif ask < bid:
+        flags.append("crossed_market")
+    elif ask and (ask - bid) / ask > 0.15:
+        flags.append("wide_spread")
+    if not isinstance(row.get("open_interest"), (int, float)):
+        flags.append("missing_open_interest")
+    quote_time = str(row.get("quote_time") or "")
+    if not quote_time:
+        flags.append("delayed_or_close_only")
+    return {
+        "level": "good" if not flags else ("limited" if len(flags) <= 2 else "weak"),
+        "flags": flags,
+    }
+
+
+def option_row_to_quote(code: str, underlying: str, surface: dict, row: dict) -> dict:
+    price = row.get("last_price")
+    previous = row.get("previous_close")
+    change = price - previous if isinstance(price, (int, float)) and isinstance(previous, (int, float)) else row.get("change")
+    change_pct = row.get("change_pct")
+    if not isinstance(change_pct, (int, float)) and isinstance(change, (int, float)) and previous:
+        change_pct = change / previous * 100
+    quote_time = str(row.get("quote_time") or "")
+    records = surface.get("records") or []
+    record_date = str(getattr(records[0], "source_date", "") or "") if records else ""
+    source_date = quote_time[:10] if len(quote_time) >= 10 else (record_date or current_china_market_date().isoformat())
+    provider = str(surface.get("provider") or "unknown")
+    return {
+        "status": "ok",
+        "symbol": code,
+        "normalizedSymbol": code,
+        "market": "期权",
+        "provider": f"mira_provider:{provider}",
+        "sourceId": row.get("vendor_source") or provider,
+        "primaryProvider": "mira_option_router",
+        "fallbackUsed": provider != "eastmoney",
+        "providerAttempts": surface.get("attempts") or [],
+        "price": price,
+        "previousClose": previous,
+        "change": change,
+        "changePct": change_pct,
+        "currency": "CNY",
+        "volume": row.get("volume"),
+        "history": [],
+        "sourceDate": source_date,
+        "quoteTime": quote_time,
+        "underlyingCode": row.get("underlying_code") or underlying,
+        "optionType": row.get("option_type"),
+        "strikePrice": row.get("strike_price"),
+        "expiryDate": row.get("expiry_date"),
+        "bid": row.get("bid_price"),
+        "ask": row.get("ask_price"),
+        "openInterest": row.get("open_interest"),
+        "impliedVolatility": row.get("implied_volatility"),
+        "delta": row.get("delta"),
+        "gamma": row.get("gamma"),
+        "theta": row.get("theta"),
+        "vega": row.get("vega"),
+        "quality": option_quote_quality(row),
+        "asOf": china_now_iso(),
+    }
+
+
+def fetch_option_quote_snapshot(contract_code: str, underlying: str = "") -> dict:
     code = str(contract_code or "").strip()
     if not re.fullmatch(r"\d{8}", code):
         return quote_gap(contract_code, "期权", "a_stock_data_sina_options", "invalid option contract code")
+    attempts = []
+    if underlying:
+        try:
+            surface = fetch_mira_option_surface(underlying)
+            attempts.extend(surface.get("attempts") or [])
+            row = next((item for item in surface.get("rows", []) if str(item.get("contract_code") or item.get("security_id") or "") == code), None)
+            if row:
+                quote = option_row_to_quote(code, underlying, surface, row)
+                if isinstance(quote.get("price"), (int, float)) and isinstance(quote.get("previousClose"), (int, float)):
+                    return quote
+                attempts.append({"provider": surface.get("provider", "mira_option_router"), "status": "incomplete_quote"})
+            else:
+                attempts.append({"provider": surface.get("provider", "mira_option_router"), "status": "contract_missing"})
+        except Exception as exc:
+            attempts.append({"provider": "mira_option_router", "status": "failed", "error": str(exc)[:180]})
+
     symbols = f"CON_OP_{code},CON_SO_{code}"
     url = SINA_OPTION_QUOTE_URL.format(symbols=symbols)
     try:
@@ -1400,13 +1696,16 @@ def fetch_option_quote_snapshot(contract_code: str) -> dict:
             else row.get("change_pct")
         )
         quote_time = row.get("quote_time") or ""
-        source_date = quote_time[:10] if len(quote_time) >= 10 else _dt.date.today().isoformat()
+        source_date = quote_time[:10] if len(quote_time) >= 10 else china_date_iso()
         return {
             "status": "ok",
             "symbol": code,
             "normalizedSymbol": code,
             "market": "期权",
             "provider": "a_stock_data_sina_options",
+            "primaryProvider": "mira_option_router",
+            "fallbackUsed": bool(underlying),
+            "providerAttempts": [*attempts, {"provider": "sina_contract_quote", "status": "ok"}],
             "price": price,
             "previousClose": previous,
             "change": change,
@@ -1428,8 +1727,9 @@ def fetch_option_quote_snapshot(contract_code: str) -> dict:
             "gamma": row.get("gamma"),
             "theta": row.get("theta"),
             "vega": row.get("vega"),
+            "quality": option_quote_quality(row),
             "url": url,
-            "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+            "asOf": china_now_iso(),
         }
     except Exception as exc:
         return quote_gap(code, "期权", "a_stock_data_sina_options", str(exc), url=url)
@@ -1492,14 +1792,6 @@ def update_market_snapshot(ticker: str, market: str = "", confirmation_token: st
         return confirm_write_preview("market", ticker, confirmation_token)
 
     market_date = current_china_market_date()
-    if market in {"A股", "ETF"} and market_date.weekday() >= 5:
-        return build_market_update_read_only_response(
-            ticker,
-            market,
-            folder,
-            f"{market_date.isoformat()} 为非开盘日",
-        )
-
     quote = fetch_quote_snapshot(ticker, market)
     if quote.get("status") != "ok":
         return {
@@ -1510,14 +1802,21 @@ def update_market_snapshot(ticker: str, market: str = "", confirmation_token: st
         }
 
     source_date = quote.get("sourceDate") or ""
-    if market in {"A股", "ETF"} and source_date != market_date.isoformat():
-        return build_market_update_read_only_response(
-            ticker,
-            market,
-            folder,
-            f"行情源最新交易日为 {source_date or '未知'}，未确认当日开盘",
-            quote=quote,
+    if market in {"A股", "ETF"}:
+        expected_date = (
+            market_date
+            if is_a_share_trading_date(market_date)
+            else previous_a_share_trading_date(market_date)
         )
+        if expected_date is None or source_date != expected_date.isoformat():
+            expected_text = expected_date.isoformat() if expected_date else "未知"
+            return build_market_update_read_only_response(
+                ticker,
+                market,
+                folder,
+                f"行情源最新交易日为 {source_date or '未知'}，预期最近交易日为 {expected_text}",
+                quote=quote,
+            )
 
     analysis = build_market_trend_analysis(quote)
     if analysis.get("status") == "source_gap":
@@ -1694,6 +1993,106 @@ def fetch_industry_news(folder: Path, ticker: str, limit: int = 12) -> dict:
         return {"status": "ok", "provider": "bing_news_rss", "url": url, "items": items}
     except (urllib.error.URLError, TimeoutError, OSError, ET.ParseError) as exc:
         return {"status": "source_gap", "message": f"新闻扫描失败：{str(exc)[:180]}", "url": url, "items": []}
+
+
+def parse_feed_symbols(value: str, limit: int = 12) -> list[str]:
+    symbols = []
+    for raw in str(value or "").split(","):
+        symbol = raw.strip().upper()
+        if not symbol or not re.fullmatch(r"[A-Z0-9.^-]{1,32}", symbol) or symbol in symbols:
+            continue
+        symbols.append(symbol)
+        if len(symbols) >= limit:
+            break
+    return symbols
+
+
+def news_cluster_key(item: dict) -> str:
+    link = str(item.get("url") or "").strip().lower()
+    if link:
+        return link
+    title = str(item.get("title") or "").lower()
+    return re.sub(r"[^0-9a-z\u4e00-\u9fff]+", "", title)[:240]
+
+
+def fetch_research_feed(symbols: list[str], *, limit_per_symbol: int = 4) -> dict:
+    symbols = parse_feed_symbols(",".join(symbols))
+    if not symbols:
+        return {"status": "error", "message": "至少需要一个合法标的代码", "items": []}
+
+    cache_key = tuple(symbols)
+    now = time.monotonic()
+    with RESEARCH_FEED_LOCK:
+        cached = RESEARCH_FEED_CACHE.get(cache_key)
+        if cached and now - float(cached.get("cached_at") or 0) < RESEARCH_FEED_TTL_SECONDS:
+            return cached["payload"]
+
+    targets = []
+    for ticker in symbols:
+        folder = find_research_folder(ticker)
+        if not folder:
+            continue
+        info = infer_object(folder)
+        targets.append({
+            "ticker": ticker,
+            "name": info.get("name") or ticker,
+            "market": infer_market(ticker),
+            "path": folder.relative_to(MIRA_ROOT).as_posix(),
+            "folder": folder,
+        })
+
+    def fetch_target(target: dict) -> tuple[dict, dict]:
+        return target, fetch_industry_news(target["folder"], target["ticker"], limit=limit_per_symbol)
+
+    results = []
+    if targets:
+        with ThreadPoolExecutor(max_workers=min(4, len(targets))) as executor:
+            results = list(executor.map(fetch_target, targets))
+
+    clusters: dict[str, dict] = {}
+    source_gaps = []
+    for target, result in results:
+        if result.get("status") != "ok":
+            source_gaps.append({"ticker": target["ticker"], "message": result.get("message") or "新闻源不可用"})
+            continue
+        related = {key: target[key] for key in ("ticker", "name", "market", "path")}
+        for item in result.get("items") or []:
+            key = news_cluster_key(item)
+            if not key:
+                continue
+            cluster = clusters.setdefault(key, {
+                "id": hashlib.sha1(key.encode("utf-8")).hexdigest()[:16],
+                "title": item.get("title") or "未命名新闻",
+                "summary": item.get("summary") or "",
+                "publishedAt": item.get("publishedAt") or "时间未提供",
+                "verificationStatus": "pending_verification",
+                "sourceType": "news_rss_discovery",
+                "sources": [],
+                "relatedObjects": [],
+            })
+            url = str(item.get("url") or "")
+            if url and not any(source.get("url") == url for source in cluster["sources"]):
+                cluster["sources"].append({"title": item.get("title") or "原始新闻", "url": url})
+            if not any(existing.get("ticker") == related["ticker"] for existing in cluster["relatedObjects"]):
+                cluster["relatedObjects"].append(related)
+
+    items = list(clusters.values())
+    for item in items:
+        item["sourceCount"] = len(item["sources"])
+    items.sort(key=lambda item: str(item.get("publishedAt") or ""), reverse=True)
+    payload = {
+        "status": "ok" if items else "source_gap",
+        "provider": "bing_news_rss",
+        "fetchedAt": china_now_iso(),
+        "message": "新闻仅用于事件发现，需查看原文后才能作为研究证据。",
+        "requestedSymbols": symbols,
+        "targetCount": len(targets),
+        "sourceGaps": source_gaps,
+        "items": items[:48],
+    }
+    with RESEARCH_FEED_LOCK:
+        RESEARCH_FEED_CACHE[cache_key] = {"cached_at": now, "payload": payload}
+    return payload
 
 
 def update_industry_news(ticker: str, market: str = "", confirmation_token: str = "") -> dict:
@@ -1922,11 +2321,11 @@ def build_existing_update_response(
 
 
 def current_china_market_date() -> _dt.date:
-    return _dt.datetime.now(_dt.timezone.utc).astimezone(CHINA_TIMEZONE).date()
+    return china_now().date()
 
 
 def is_a_share_trading_date(value: _dt.date) -> bool:
-    holiday_ranges = A_SHARE_HOLIDAY_RANGES.get(value.year)
+    holiday_ranges = a_share_holiday_ranges(value.year)
     if holiday_ranges is None or value.weekday() >= 5:
         return False
     return not any(start <= value <= end for start, end in holiday_ranges)
@@ -1947,7 +2346,8 @@ def a_share_market_session(now_utc: _dt.datetime | None = None) -> dict:
         now_utc = now_utc.replace(tzinfo=_dt.timezone.utc)
     china_now = now_utc.astimezone(CHINA_TIMEZONE)
     market_date = china_now.date()
-    holiday_ranges = A_SHARE_HOLIDAY_RANGES.get(market_date.year)
+    calendar = read_market_calendar()
+    holiday_ranges = a_share_holiday_ranges(market_date.year)
     calendar_known = holiday_ranges is not None
     is_trading_day = is_a_share_trading_date(market_date)
     market_time = china_now.time().replace(tzinfo=None)
@@ -1972,10 +2372,13 @@ def a_share_market_session(now_utc: _dt.datetime | None = None) -> dict:
         expected_quote_date = market_date
     else:
         expected_quote_date = previous_a_share_trading_date(market_date)
+    archive_allowed = calendar_known and phase != "trading" and expected_quote_date is not None
 
     return {
         "status": "ok",
         "market": "A股",
+        "calendarVersion": ((calendar.get("contract") or {}).get("version")),
+        "calendarSource": (calendar.get("source") or {}).get("notice", ""),
         "marketDate": market_date.isoformat(),
         "chinaNow": china_now.isoformat(timespec="seconds"),
         "calendarKnown": calendar_known,
@@ -1983,6 +2386,9 @@ def a_share_market_session(now_utc: _dt.datetime | None = None) -> dict:
         "phase": phase,
         "expectedQuoteDate": expected_quote_date.isoformat() if expected_quote_date else "",
         "autoRefreshAllowed": is_trading_day and phase == "closed",
+        # 自动刷新只在当日收盘后运行；手动刷新还可以补归档最近一个已收盘交易日，
+        # 例如周末、休市日和开盘前。
+        "archiveAllowed": archive_allowed,
         "message": message,
     }
 
@@ -2011,7 +2417,11 @@ def archive_overview_quotes(payload: dict) -> dict:
     if not isinstance(quotes, list) or not quotes or len(quotes) > 500:
         raise ValueError("overview quote archive requires 1-500 rows")
     market_session = a_share_market_session()
-    if not market_session.get("autoRefreshAllowed") or market_session.get("phase") != "closed":
+    archive_allowed = market_session.get("archiveAllowed")
+    if archive_allowed is None:
+        # Compatibility for test fixtures and older in-process callers.
+        archive_allowed = market_session.get("autoRefreshAllowed") and market_session.get("phase") == "closed"
+    if not archive_allowed:
         return {
             "status": "skipped",
             "reason": "market_not_closed",
@@ -2028,7 +2438,25 @@ def archive_overview_quotes(payload: dict) -> dict:
             "count": 0,
             "message": f"归档日期应为 {expected_quote_date or '当日收盘日期'}，不写入 overview-quotes.csv",
         }
-    archived_at = _dt.datetime.now().isoformat(timespec="seconds")
+    incomplete_a_share = [
+        str(item.get("symbol") or "")
+        for item in quotes
+        if str(item.get("market") or "") in {"A股", "ETF"}
+        and (
+            str(item.get("status") or "") != "ok"
+            or not isinstance(item.get("price"), (int, float))
+            or str(item.get("sourceDate") or "") != archive_date
+        )
+    ]
+    if incomplete_a_share:
+        return {
+            "status": "skipped",
+            "reason": "incomplete_a_share_snapshot",
+            "archiveDate": archive_date,
+            "count": 0,
+            "message": f"A股/ETF 快照不完整或日期不匹配：{', '.join(incomplete_a_share[:8])}；保留现有 CSV",
+        }
+    archived_at = china_now_iso()
     fieldnames = [
         "archive_date", "symbol", "market", "name", "price", "previous_close", "change", "change_pct",
         "volume", "volume_ratio", "industry", "provider", "source_date", "as_of", "status", "message", "archived_at",
@@ -2040,6 +2468,12 @@ def archive_overview_quotes(payload: dict) -> dict:
         symbol = str(item.get("symbol", "")).strip().upper()
         if not symbol or len(symbol) > 32:
             raise ValueError("overview quote row has invalid symbol")
+        # A `?` in these Chinese display fields is a lossy client-encoding marker,
+        # not usable market metadata. Refuse the entire archive rather than making
+        # a correct local snapshot look incomplete after a page reload.
+        for field in ("market", "name", "industry"):
+            if "?" in str(item.get(field) or ""):
+                raise ValueError(f"overview quote row has lossy text in {field}")
         status = str(item.get("status") or "source_gap")[:40]
         rows.append({
             "archive_date": archive_date,
@@ -2097,7 +2531,7 @@ def refresh_tushare_history(payload: dict) -> dict:
         if value not in normalized:
             normalized.append(value)
 
-    end_text = str(payload.get("end") or a_share_market_session().get("expectedQuoteDate") or _dt.date.today().isoformat())
+    end_text = str(payload.get("end") or a_share_market_session().get("expectedQuoteDate") or china_date_iso())
     try:
         end_date = _dt.date.fromisoformat(end_text)
     except ValueError as exc:
@@ -2140,7 +2574,7 @@ def refresh_tushare_history(payload: dict) -> dict:
     except json.JSONDecodeError as exc:
         raise ValueError("TuShare history adapter returned invalid JSON") from exc
 
-    fetched_at = _dt.datetime.now().isoformat(timespec="seconds")
+    fetched_at = china_now_iso()
     archive_rows = []
     summaries = []
     successful_symbols = set()
@@ -2192,7 +2626,7 @@ def archive_portfolio_snapshot(payload: dict) -> dict:
     point = payload.get("seriesPoint") or {}
     if not positions or any(item.get("quoteStatus") != "ok" for item in positions):
         raise ValueError("portfolio archive requires complete quotes")
-    archived_at = _dt.datetime.now().isoformat(timespec="seconds")
+    archived_at = china_now_iso()
     position_fields = ["date","account","code","name","quantity","cost_price","multiplier","close_price","previous_close","market_value","floating_profit","quote_status","source"]
     position_rows = [{
         "date": date, "account": item.get("account"), "code": item.get("code"), "name": item.get("name"),
@@ -2338,8 +2772,8 @@ def first_number(values: list[float | None]) -> float:
 
 
 def render_market_update_markdown(folder: Path, quote: dict, analysis: dict) -> str:
-    now = _dt.datetime.now().isoformat(timespec="minutes")
-    source_date = quote.get("sourceDate") or _dt.date.today().isoformat()
+    now = china_now_iso(timespec="minutes")
+    source_date = quote.get("sourceDate") or china_date_iso()
     name = folder.name.split("_", 1)[1] if "_" in folder.name else folder.name
     ticker = quote.get("symbol") or folder.name.split("_", 1)[0]
     currency = quote.get("currency") or default_currency(quote.get("market", ""))
@@ -2439,7 +2873,7 @@ def extract_price_history(result: dict) -> list[dict]:
         high_value = max(high_value, open_value, close_value)
         low_value = min(low_value, open_value, close_value)
         rows.append({
-            "date": _dt.datetime.fromtimestamp(stamp).date().isoformat(),
+            "date": _dt.datetime.fromtimestamp(stamp, tz=_dt.timezone.utc).astimezone(CHINA_TIMEZONE).date().isoformat(),
             "open": round(open_value, 4),
             "high": round(high_value, 4),
             "low": round(low_value, 4),
@@ -2597,18 +3031,52 @@ def quote_gap(ticker: str, market: str, provider: str, message: str, *, url: str
         "provider": provider,
         "message": message,
         "url": url,
-        "asOf": _dt.datetime.now().isoformat(timespec="seconds"),
+        "asOf": china_now_iso(),
     }
 
 
-def parse_quote_pairs(symbols_value: str, markets_value: str, limit: int = 80) -> list[tuple[str, str]]:
+def parse_quote_requests(symbols_value: str, markets_value: str, underlyings_value: str = "", limit: int = 40) -> list[tuple[str, str, str]]:
     symbols = (symbols_value or "").split(",")
     markets = (markets_value or "").split(",") if markets_value else []
+    underlyings = (underlyings_value or "").split(",") if underlyings_value else []
     return [
-        (symbol.strip(), markets[index].strip() if index < len(markets) else "")
+        (symbol.strip(), markets[index].strip() if index < len(markets) else "",
+         underlyings[index].strip() if index < len(underlyings) else "")
         for index, symbol in enumerate(symbols)
         if symbol.strip()
     ][:limit]
+
+
+def parse_quote_pairs(symbols_value: str, markets_value: str, limit: int = 40) -> list[tuple[str, str]]:
+    return [(symbol, market) for symbol, market, _ in parse_quote_requests(symbols_value, markets_value, limit=limit)]
+
+
+def parse_optional_price_list(prices_value: str, limit: int = 40) -> list[float | None]:
+    values = (prices_value or "").split(",")[:limit]
+    prices: list[float | None] = []
+    for value in values:
+        try:
+            number = float(value)
+            prices.append(number if number > 0 else None)
+        except (TypeError, ValueError):
+            prices.append(None)
+    return prices
+
+
+def build_mira_levels_response(symbols_value: str, markets_value: str = "", prices_value: str = "") -> dict:
+    pairs = parse_quote_pairs(symbols_value, markets_value)
+    prices = parse_optional_price_list(prices_value, limit=len(pairs))
+    items = []
+    for index, (symbol, market) in enumerate(pairs):
+        reference_price = prices[index] if index < len(prices) else None
+        levels = extract_mira_price_levels(symbol, reference_price)
+        items.append({
+            "symbol": symbol,
+            "market": market,
+            "miraLevels": levels,
+            "levelCount": len(levels),
+        })
+    return {"status": "ok", "count": len(items), "items": items}
 
 
 def http_get_json(url: str, *, timeout: int = 12) -> dict:
@@ -2629,28 +3097,124 @@ def http_get_text(
         return resp.read().decode(encoding, errors="replace")
 
 
-def scan_research_index(limit: int = 200) -> dict:
-  if not RESEARCH_ROOT.exists():
-    return {
-      "status": "missing",
-      "miraRoot": str(MIRA_ROOT),
-      "researchRoot": str(RESEARCH_ROOT),
-      "objects": [],
+def fetch_fred_yield(key: str, label: str, series_id: str) -> dict:
+    url = FRED_CSV_URL.format(series_id=series_id)
+    try:
+        rows = csv.DictReader(http_get_text(url, timeout=12).splitlines())
+        observations = []
+        for row in rows:
+            raw = str(row.get(series_id) or "").strip()
+            try:
+                value = float(raw)
+            except ValueError:
+                continue
+            observations.append((str(row.get("DATE") or ""), value))
+        if not observations:
+            return {"id": key, "label": label, "kind": "yield", "status": "source_gap", "message": "FRED 未返回有效观测值", "provider": "fred"}
+        source_date, value = observations[-1]
+        previous = observations[-2][1] if len(observations) > 1 else None
+        return {
+            "id": key,
+            "label": label,
+            "kind": "yield",
+            "status": "ok",
+            "value": value,
+            "previousClose": previous,
+            "change": value - previous if previous is not None else None,
+            "unit": "%",
+            "provider": "fred",
+            "sourceLabel": "FRED 日度参考值",
+            "sourceDate": source_date,
+            "asOf": china_now_iso(),
+            "url": url,
+        }
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, csv.Error) as exc:
+        return {"id": key, "label": label, "kind": "yield", "status": "source_gap", "message": f"FRED 获取失败：{str(exc)[:140]}", "provider": "fred", "url": url}
+
+
+def fetch_yahoo_market_pulse(key: str, label: str, symbol: str) -> dict:
+    url = YAHOO_CHART_URL.format(symbol=symbol)
+    try:
+        payload = http_get_json(url, timeout=12)
+        result = ((payload.get("chart") or {}).get("result") or [None])[0]
+        if not result:
+            raise ValueError("Yahoo 未返回行情")
+        meta = result.get("meta") or {}
+        history = extract_price_history(result)
+        value = meta.get("regularMarketPrice")
+        if not isinstance(value, (int, float)):
+            raise ValueError("Yahoo 未返回最新值")
+        previous = infer_previous_close(meta, history)
+        quote_time = meta.get("regularMarketTime")
+        source_date = (
+            _dt.datetime.fromtimestamp(quote_time, tz=_dt.timezone.utc).astimezone(CHINA_TIMEZONE).date().isoformat()
+            if isinstance(quote_time, (int, float)) else china_date_iso()
+        )
+        return {
+            "id": key,
+            "label": label,
+            "kind": "fx" if key != "dxy" else "index",
+            "status": "ok",
+            "value": float(value),
+            "previousClose": previous,
+            "change": float(value) - previous if isinstance(previous, (int, float)) else None,
+            "unit": "",
+            "provider": "yahoo_chart",
+            "sourceLabel": "Yahoo Chart（可能延迟）",
+            "sourceDate": source_date,
+            "asOf": china_now_iso(),
+            "url": url,
+        }
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+        return {"id": key, "label": label, "kind": "fx" if key != "dxy" else "index", "status": "source_gap", "message": f"Yahoo 获取失败：{str(exc)[:140]}", "provider": "yahoo_chart", "url": url}
+
+
+def read_market_pulse() -> dict:
+    now = time.monotonic()
+    with MARKET_PULSE_LOCK:
+        cached = MARKET_PULSE_CACHE.get("payload")
+        if cached and now - float(MARKET_PULSE_CACHE.get("cached_at") or 0) < MARKET_PULSE_TTL_SECONDS:
+            return cached
+
+    tasks = [
+        *(lambda item=item: fetch_fred_yield(*item) for item in MARKET_PULSE_FRED_SERIES),
+        *(lambda item=item: fetch_yahoo_market_pulse(*item) for item in MARKET_PULSE_YAHOO_SERIES),
+    ]
+    with ThreadPoolExecutor(max_workers=len(tasks)) as executor:
+        items = list(executor.map(lambda task: task(), tasks))
+    payload = {
+        "status": "ok" if any(item.get("status") == "ok" for item in items) else "source_gap",
+        "fetchedAt": china_now_iso(),
+        "items": items,
+        "message": "收益率使用 FRED 日度参考值；汇率和美元指数使用 Yahoo Chart，可能延迟。不可用数据不会以旧值替代。",
     }
+    with MARKET_PULSE_LOCK:
+        MARKET_PULSE_CACHE.update({"cached_at": now, "payload": payload})
+    return payload
 
-  objects = []
-  for folder in sorted(safe_children(RESEARCH_ROOT), key=lambda item: item.name.lower()):
-    if folder.is_dir() and is_safe_mira_path(folder):
-      objects.append(infer_object(folder))
-    if len(objects) >= limit:
-      break
 
-  return {
-    "status": "ok",
-    "miraRoot": str(MIRA_ROOT),
-    "researchRoot": str(RESEARCH_ROOT),
-    "objects": objects,
-  }
+def scan_research_index(limit: int = 200) -> dict:
+    if not RESEARCH_ROOT.exists():
+        return {
+            "status": "missing",
+            "miraRoot": str(MIRA_ROOT),
+            "researchRoot": str(RESEARCH_ROOT),
+            "objects": [],
+        }
+
+    objects = []
+    for folder in sorted(safe_children(RESEARCH_ROOT), key=lambda item: item.name.lower()):
+        if folder.is_dir() and is_safe_mira_path(folder):
+            objects.append(infer_object(folder))
+        if len(objects) >= limit:
+            break
+
+    return {
+        "status": "ok",
+        "miraRoot": str(MIRA_ROOT),
+        "researchRoot": str(RESEARCH_ROOT),
+        "objects": objects,
+    }
 
 
 def scan_industry_docs(limit: int = 200) -> dict:
@@ -2788,6 +3352,10 @@ def build_bootstrap() -> dict:
             board_object["industryFiles"] = industry_files.get(str(board_object.get("ticker") or "").upper(), [])
             board_objects.append(board_object)
         bootstrap["objects"] = board_objects
+        bootstrap["objectLibraryFiles"] = build_object_library_files(
+            board_objects,
+            bootstrap.get("objectLibraryFiles", []),
+        )
     if industry_docs["status"] == "ok" and industry_docs["files"]:
         bootstrap["industryDocs"] = industry_docs["files"]
     methodology_docs = scan_methodology_docs()
@@ -2811,316 +3379,354 @@ def build_bootstrap() -> dict:
 
 
 def read_source_file(rel_path: str) -> dict:
-  if not rel_path:
-    return {"status": "error", "message": "missing path"}
+    if not rel_path:
+        return {"status": "error", "message": "missing path"}
 
-  if ".." in Path(rel_path).parts:
-    return {"status": "error", "message": "parent path segments are not allowed"}
-  target = resolve_within(MIRA_ROOT / rel_path, MIRA_ROOT)
-  if target is None:
-    return {"status": "error", "message": "path outside Mira root"}
+    if ".." in Path(rel_path).parts:
+        return {"status": "error", "message": "parent path segments are not allowed"}
+    target = resolve_within(MIRA_ROOT / rel_path, MIRA_ROOT)
+    if target is None:
+        return {"status": "error", "message": "path outside Mira root"}
 
-  if not target.exists() or not target.is_file():
-    return {"status": "missing", "message": "file not found"}
+    if not target.exists() or not target.is_file():
+        return {"status": "missing", "message": "file not found"}
 
-  if target.suffix.lower() not in TEXT_SUFFIXES:
+    if target.suffix.lower() not in TEXT_SUFFIXES:
+        return {
+            "status": "unsupported",
+            "path": rel_path,
+            "type": target.suffix.lower().lstrip("."),
+            "message": "preview supports text files only",
+        }
+
+    try:
+        raw = target.read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        return {"status": "error", "message": f"file could not be read: {str(exc)[:160]}"}
+    truncated = len(raw) > MAX_TEXT_PREVIEW_CHARS
+    text = raw[:MAX_TEXT_PREVIEW_CHARS]
     return {
-      "status": "unsupported",
-      "path": rel_path,
-      "type": target.suffix.lower().lstrip("."),
-      "message": "preview supports text files only",
+        "status": "ok",
+        "path": rel_path,
+        "title": target.name,
+        "type": target.suffix.lower().lstrip("."),
+        "text": text,
+        "summary": extract_markdown_summary(text) if target.suffix.lower() == ".md" else {},
+        "truncated": truncated,
+        **safe_stat(target),
     }
-
-  try:
-    raw = target.read_text(encoding="utf-8", errors="replace")
-  except OSError as exc:
-    return {"status": "error", "message": f"file could not be read: {str(exc)[:160]}"}
-  truncated = len(raw) > MAX_TEXT_PREVIEW_CHARS
-  text = raw[:MAX_TEXT_PREVIEW_CHARS]
-  return {
-    "status": "ok",
-    "path": rel_path,
-    "title": target.name,
-    "type": target.suffix.lower().lstrip("."),
-    "text": text,
-    "summary": extract_markdown_summary(text) if target.suffix.lower() == ".md" else {},
-    "truncated": truncated,
-    **safe_stat(target),
-  }
 
 
 def extract_markdown_summary(text: str) -> dict:
-  lines = text.splitlines()
-  return {
-    "dataCutoff": find_key_value(lines, ["data_cutoff", "data cutoff", "数据截止", "数据截至"]),
-    "mustRefreshIf": find_section(lines, ["must_refresh_if", "must refresh if", "刷新边界", "必须刷新"], skip_tables=True),
-    "coreConclusion": find_core_conclusion(lines),
-  }
+    lines = text.splitlines()
+    return {
+        "dataCutoff": find_key_value(lines, ["data_cutoff", "data cutoff", "数据截止", "数据截至"]),
+        "mustRefreshIf": find_section(lines, ["must_refresh_if", "must refresh if", "刷新边界", "必须刷新"], skip_tables=True),
+        "coreConclusion": find_core_conclusion(lines),
+    }
 
 
 def find_key_value(lines: list[str], keys: list[str]) -> str:
-  lowered_keys = [key.lower() for key in keys]
-  for line in lines[:80]:
-    clean = line.strip().strip("-").strip()
-    low = clean.lower()
-    for key in lowered_keys:
-      if low.startswith(key):
-        value = clean.split(":", 1)[-1].strip() if ":" in clean else clean
-        return value[:240]
-  return ""
+    lowered_keys = [key.lower() for key in keys]
+    for line in lines[:80]:
+        clean = line.strip().strip("-").strip()
+        low = clean.lower()
+        for key in lowered_keys:
+            if low.startswith(key):
+                value = clean.split(":", 1)[-1].strip() if ":" in clean else clean
+                return value[:240]
+    return ""
 
 
 def find_section(lines: list[str], headings: list[str], max_lines: int = 4, skip_tables: bool = False) -> str:
-  heading_keys = [heading.lower() for heading in headings]
-  for index, line in enumerate(lines):
-    clean = line.strip().lstrip("#").strip()
-    low = clean.lower()
-    if any(key in low for key in heading_keys):
-      collected = []
-      for next_line in lines[index + 1:index + 1 + max_lines + 8]:
-        stripped = next_line.strip()
-        if stripped.startswith("#") and collected:
-          break
-        if not stripped:
-          if collected:
-            break
-          continue
-        if skip_tables and is_markdown_table_line(stripped):
-          continue
-        collected.append(clean_summary_text(stripped.strip("-").strip()))
-        if len(collected) >= max_lines:
-          break
-      return " ".join(collected)[:520]
-  return ""
+    heading_keys = [heading.lower() for heading in headings]
+    for index, line in enumerate(lines):
+        clean = line.strip().lstrip("#").strip()
+        low = clean.lower()
+        if any(key in low for key in heading_keys):
+            collected = []
+            for next_line in lines[index + 1:index + 1 + max_lines + 8]:
+                stripped = next_line.strip()
+                if stripped.startswith("#") and collected:
+                    break
+                if not stripped:
+                    if collected:
+                        break
+                    continue
+                if skip_tables and is_markdown_table_line(stripped):
+                    continue
+                collected.append(clean_summary_text(stripped.strip("-").strip()))
+                if len(collected) >= max_lines:
+                    break
+            return " ".join(collected)[:520]
+    return ""
 
 
 def is_markdown_table_line(line: str) -> bool:
-  clean = line.strip()
-  if not clean:
+    clean = line.strip()
+    if not clean:
+        return False
+    if clean.startswith("|") and clean.endswith("|"):
+        return True
+    if re.match(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$", clean):
+        return True
     return False
-  if clean.startswith("|") and clean.endswith("|"):
-    return True
-  if re.match(r"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$", clean):
-    return True
-  return False
 
 
 def find_core_conclusion(lines: list[str]) -> str:
-  direct = find_inline_value(lines, ["核心判断", "核心结论", "investment view"])
-  if direct:
-    return direct
-  return find_section(lines, ["core conclusion", "核心结论", "结论", "investment view"], skip_tables=True)
+    direct = find_inline_value(lines, ["核心判断", "核心结论", "investment view"])
+    if direct:
+        return direct
+    return find_section(lines, ["core conclusion", "核心结论", "结论", "investment view"], skip_tables=True)
 
 
 def find_inline_value(lines: list[str], keys: list[str]) -> str:
-  lowered_keys = [key.lower() for key in keys]
-  for line in lines[:120]:
-    clean = line.strip().strip("-").strip()
-    if is_markdown_table_line(clean):
-      continue
-    low = clean.lower()
-    for key in lowered_keys:
-      if low.startswith(key):
-        value = re.split(r"[:：]", clean, maxsplit=1)
-        if len(value) > 1 and value[1].strip():
-          return clean_summary_text(value[1])[:520]
-  return ""
+    lowered_keys = [key.lower() for key in keys]
+    for line in lines[:120]:
+        clean = line.strip().strip("-").strip()
+        if is_markdown_table_line(clean):
+            continue
+        low = clean.lower()
+        for key in lowered_keys:
+            if low.startswith(key):
+                value = re.split(r"[:：]", clean, maxsplit=1)
+                if len(value) > 1 and value[1].strip():
+                    return clean_summary_text(value[1])[:520]
+    return ""
 
 
 def clean_summary_text(value: str) -> str:
-  value = re.sub(r"^\*{0,2}\s*(核心判断|核心结论|investment view)\s*[:：]\s*\*{0,2}\s*", "", value.strip(), flags=re.I)
-  value = re.sub(r"^\*{1,2}|\*{1,2}$", "", value).strip()
-  return value
+    value = re.sub(r"^\*{0,2}\s*(核心判断|核心结论|investment view)\s*[:：]\s*\*{0,2}\s*", "", value.strip(), flags=re.I)
+    value = re.sub(r"^\*{1,2}|\*{1,2}$", "", value).strip()
+    return value
 
 
 class MiraBoardHandler(SimpleHTTPRequestHandler):
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, directory=str(APP_ROOT), **kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(APP_ROOT), **kwargs)
 
-  def do_GET(self):
-    try:
-      self.handle_GET()
-    except Exception as exc:
-      self.send_json({"status": "error", "message": f"服务内部错误：{str(exc)[:180]}"}, code=500)
+    def do_GET(self):
+        try:
+            self.handle_GET()
+        except Exception as exc:
+            self.send_json({"status": "error", "message": f"服务内部错误：{str(exc)[:180]}"}, code=500)
 
-  def handle_GET(self):
-    parsed = urlparse(self.path)
-    path = unquote(parsed.path)
-    if path == "/api/bootstrap":
-      self.send_json(build_bootstrap())
-      return
-    if path == "/api/research-index":
-      self.send_json(scan_research_index())
-      return
-    if path == "/api/provider-status":
-      self.send_json(read_provider_status())
-      return
-    if path == "/api/position-reviews":
-      self.send_json(read_position_reviews())
-      return
-    if path == "/api/source-file":
-      params = parse_qs(parsed.query)
-      self.send_json(read_source_file(params.get("path", [""])[0]))
-      return
-    if path == "/api/quote":
-      params = parse_qs(parsed.query)
-      self.send_json(fetch_quote_snapshot(
-          params.get("symbol", [""])[0],
-          params.get("market", [""])[0],
-      ))
-      return
-    if path == "/api/quotes":
-      params = parse_qs(parsed.query)
-      pairs = parse_quote_pairs(
-          params.get("symbols", [""])[0],
-          params.get("markets", [""])[0] if params.get("markets") else "",
-      )
-      with ThreadPoolExecutor(max_workers=min(8, max(1, len(pairs)))) as executor:
-        quotes = list(executor.map(lambda pair: fetch_quote_snapshot(*pair), pairs))
-      self.send_json({"status": "ok", "count": len(quotes), "quotes": quotes})
-      return
-    if path == "/api/market-session":
-      self.send_json(a_share_market_session())
-      return
-    if path == "/api/health":
-      self.send_json({
-        "status": "ok",
-        "appRoot": str(APP_ROOT),
-        "miraRoot": str(MIRA_ROOT),
-        "researchRootExists": RESEARCH_ROOT.exists(),
-        "providerStatusExists": PROVIDER_STATUS_PATH.exists(),
-        "stockApiInstalled": STOCK_API_PACKAGE_PATH.exists(),
-      })
-      return
-    if path == "/api/ai-config":
-      self.send_json({"status": "ok", "config": public_ai_config()})
-      return
-    if path.startswith("/api/"):
-      self.send_json({"status": "error", "message": f"unknown endpoint: {path}"}, code=404)
-      return
-    if not is_public_static_path(path):
-      self.send_error(404, "Not found")
-      return
-    super().do_GET()
+    def handle_GET(self):
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        if path.startswith("/api/read/"):
+            path = "/api/" + path.removeprefix("/api/read/")
+        if path.startswith("/api/") and not is_trusted_local_request(self.headers):
+            self.send_json({"status": "error", "message": "已拒绝跨站或非本机 API 请求"}, code=403)
+            return
+        if path == "/api/bootstrap":
+            self.send_read_json("bootstrap", build_bootstrap())
+            return
+        if path == "/api/research-index":
+            self.send_read_json("research-index", scan_research_index(), code=200)
+            return
+        if path == "/api/provider-status":
+            self.send_read_json("provider-status", read_provider_status())
+            return
+        if path == "/api/position-reviews":
+            self.send_read_json("position-reviews", read_position_reviews(), code=200)
+            return
+        if path == "/api/source-file":
+            params = parse_qs(parsed.query)
+            self.send_read_json("source-file", read_source_file(params.get("path", [""])[0]))
+            return
+        if path == "/api/quote":
+            params = parse_qs(parsed.query)
+            self.send_read_json("quote", fetch_quote_snapshot(
+                    params.get("symbol", [""])[0],
+                    params.get("market", [""])[0],
+                    params.get("underlying", [""])[0],
+            ))
+            return
+        if path == "/api/quotes":
+            params = parse_qs(parsed.query)
+            pairs = parse_quote_requests(
+                    params.get("symbols", [""])[0],
+                    params.get("markets", [""])[0] if params.get("markets") else "",
+                    params.get("underlyings", [""])[0] if params.get("underlyings") else "",
+            )
+            if not QUOTE_BATCH_SEMAPHORE.acquire(blocking=False):
+                self.send_json({"status": "busy", "message": "批量行情任务繁忙，请稍后重试"}, code=429)
+                return
+            try:
+                with ThreadPoolExecutor(max_workers=min(8, max(1, len(pairs)))) as executor:
+                    quotes = list(executor.map(lambda pair: fetch_quote_snapshot(*pair), pairs))
+            finally:
+                QUOTE_BATCH_SEMAPHORE.release()
+            self.send_read_json("quotes", {"status": "ok", "count": len(quotes), "quotes": quotes})
+            return
+        if path == "/api/mira-levels":
+            params = parse_qs(parsed.query)
+            self.send_read_json("mira-levels", build_mira_levels_response(
+                    params.get("symbols", [""])[0],
+                    params.get("markets", [""])[0] if params.get("markets") else "",
+                    params.get("prices", [""])[0] if params.get("prices") else "",
+            ))
+            return
+        if path == "/api/market-session":
+            self.send_read_json("market-session", a_share_market_session())
+            return
+        if path == "/api/market-calendar":
+            self.send_read_json("market-calendar", read_market_calendar())
+            return
+        if path == "/api/market-pulse":
+            self.send_read_json("market-pulse", read_market_pulse())
+            return
+        if path == "/api/research-feed":
+            params = parse_qs(parsed.query)
+            self.send_read_json("research-feed", fetch_research_feed(
+                parse_feed_symbols(params.get("symbols", [""])[0]),
+            ))
+            return
+        if path == "/api/operations":
+            self.send_read_json("operations-catalog", controlled_operations_catalog())
+            return
+        if path == "/api/health":
+            self.send_read_json("health", {
+                "status": "ok",
+                "appRoot": str(APP_ROOT),
+                "serverSourceHash": SERVER_SOURCE_HASH,
+                "miraRoot": str(MIRA_ROOT),
+                "researchRootExists": RESEARCH_ROOT.exists(),
+                "providerStatusExists": PROVIDER_STATUS_PATH.exists(),
+                "stockApiInstalled": STOCK_API_PACKAGE_PATH.exists(),
+            })
+            return
+        if path == "/api/ai-config":
+            self.send_read_json("ai-config", {"status": "ok", "config": public_ai_config()})
+            return
+        if path.startswith("/api/"):
+            self.send_json({"status": "error", "message": f"unknown endpoint: {path}"}, code=404)
+            return
+        if not is_public_static_path(path):
+            self.send_error(404, "Not found")
+            return
+        super().do_GET()
 
-  def do_HEAD(self):
-    path = unquote(urlparse(self.path).path)
-    if path.startswith("/api/") or not is_public_static_path(path):
-      self.send_error(404, "Not found")
-      return
-    super().do_HEAD()
+    def do_HEAD(self):
+        path = unquote(urlparse(self.path).path)
+        if path.startswith("/api/") or not is_public_static_path(path):
+            self.send_error(404, "Not found")
+            return
+        super().do_HEAD()
 
-  def do_POST(self):
-    try:
-      if not self.is_trusted_post_origin():
-        self.send_json({"status": "error", "message": "已拒绝来自其他网页的请求"}, code=403)
+    def do_POST(self):
+        try:
+            if not self.is_trusted_post_origin():
+                self.send_json({"status": "error", "message": "已拒绝来自其他网页的请求"}, code=403)
+                return
+            self.handle_POST()
+        except ValueError as exc:
+            self.send_json({"status": "error", "message": str(exc)}, code=400)
+        except Exception as exc:
+            self.send_json({"status": "error", "message": f"服务内部错误：{str(exc)[:180]}"}, code=500)
+
+    def handle_POST(self):
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        if path.startswith("/api/ops/"):
+            path = "/api/" + path.removeprefix("/api/ops/")
+        if path == "/api/update-market":
+            payload = self.read_json_body()
+            self.send_operation_json("market-update", update_market_snapshot(
+                    payload.get("symbol", ""),
+                    payload.get("market", ""),
+                    payload.get("confirmationToken", ""),
+            ))
+            return
+        if path == "/api/update-news":
+            payload = self.read_json_body()
+            self.send_operation_json("industry-news-update", update_industry_news(
+                    payload.get("symbol", ""),
+                    payload.get("market", ""),
+                    payload.get("confirmationToken", ""),
+            ))
+            return
+        if path == "/api/ai-config":
+            self.send_operation_json("ai-config", save_ai_config(self.read_json_body()))
+            return
+        if path == "/api/ai-test":
+            self.send_operation_json("ai-test", test_ai_connection())
+            return
+        if path == "/api/portfolio-archive":
+            self.send_operation_json("portfolio-archive", archive_portfolio_snapshot(self.read_json_body()))
+            return
+        if path == "/api/overview-quotes-archive":
+            self.send_operation_json("overview-quotes-archive", archive_overview_quotes(self.read_json_body()))
+            return
+        if path == "/api/overview-history-refresh":
+            self.send_operation_json("overview-history-refresh", refresh_tushare_history(self.read_json_body()))
+            return
+        self.send_json({"status": "error", "message": f"unknown endpoint: {path}"}, code=404)
+
+    def is_trusted_post_origin(self) -> bool:
+        return is_trusted_local_request(self.headers)
+
+    def read_json_body(self) -> dict:
+        try:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            if length < 0:
+                raise ValueError("request body length is invalid")
+            if length > 1_000_000:
+                raise ValueError("request body is too large")
+            raw = self.rfile.read(length).decode("utf-8") if length else "{}"
+            payload = json.loads(raw or "{}")
+            if not isinstance(payload, dict):
+                raise ValueError("request body must be a JSON object")
+            return payload
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("request body is not valid JSON") from exc
+
+    def send_json(self, payload: dict, code: int | None = None):
+        if code is None:
+            code = {
+                    "error": 400,
+                    "missing": 404,
+                    "unsupported": 422,
+                    "confirmation_required": 428,
+            }.get(payload.get("status"), 200)
+        body = json.dumps(json_safe_value(payload), ensure_ascii=False, indent=2, allow_nan=False).encode("utf-8")
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def send_read_json(self, contract_name: str, payload: dict, code: int | None = None):
+        errors = validate_contract_payload(contract_name, payload)
+        if errors and payload.get("status") == "ok":
+            payload = {"status": "error", "message": f"invalid {contract_name} contract: {'; '.join(errors)}"}
+        self.send_json(with_read_contract(contract_name, payload), code=code)
+
+    def send_operation_json(self, operation: str, payload: dict, code: int | None = None):
+        self.send_json(with_operation_contract(operation, payload), code=code)
+
+    def end_headers(self):
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        super().end_headers()
+
+    def log_message(self, format, *args):
         return
-      self.handle_POST()
-    except ValueError as exc:
-      self.send_json({"status": "error", "message": str(exc)}, code=400)
-    except Exception as exc:
-      self.send_json({"status": "error", "message": f"服务内部错误：{str(exc)[:180]}"}, code=500)
-
-  def handle_POST(self):
-    parsed = urlparse(self.path)
-    path = unquote(parsed.path)
-    if path == "/api/update-market":
-      payload = self.read_json_body()
-      self.send_json(update_market_snapshot(
-          payload.get("symbol", ""),
-          payload.get("market", ""),
-          payload.get("confirmationToken", ""),
-      ))
-      return
-    if path == "/api/update-news":
-      payload = self.read_json_body()
-      self.send_json(update_industry_news(
-          payload.get("symbol", ""),
-          payload.get("market", ""),
-          payload.get("confirmationToken", ""),
-      ))
-      return
-    if path == "/api/ai-config":
-      self.send_json(save_ai_config(self.read_json_body()))
-      return
-    if path == "/api/ai-test":
-      self.send_json(test_ai_connection())
-      return
-    if path == "/api/portfolio-archive":
-      self.send_json(archive_portfolio_snapshot(self.read_json_body()))
-      return
-    if path == "/api/overview-quotes-archive":
-      self.send_json(archive_overview_quotes(self.read_json_body()))
-      return
-    if path == "/api/overview-history-refresh":
-      self.send_json(refresh_tushare_history(self.read_json_body()))
-      return
-    self.send_json({"status": "error", "message": f"unknown endpoint: {path}"}, code=404)
-
-  def is_trusted_post_origin(self) -> bool:
-    origin = self.headers.get("Origin")
-    host = (self.headers.get("Host") or "").lower()
-    host_name = urlparse(f"//{host}").hostname or ""
-    if host_name not in {"127.0.0.1", "localhost", "::1"}:
-      return False
-    if not origin:
-      return True
-    parsed = urlparse(origin)
-    return parsed.scheme in {"http", "https"} and parsed.netloc.lower() == host and parsed.hostname in {
-        "127.0.0.1", "localhost", "::1",
-    }
-
-  def read_json_body(self) -> dict:
-    try:
-      length = int(self.headers.get("Content-Length", "0") or "0")
-      if length < 0:
-        raise ValueError("request body length is invalid")
-      if length > 1_000_000:
-        raise ValueError("request body is too large")
-      raw = self.rfile.read(length).decode("utf-8") if length else "{}"
-      payload = json.loads(raw or "{}")
-      if not isinstance(payload, dict):
-        raise ValueError("request body must be a JSON object")
-      return payload
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-      raise ValueError("request body is not valid JSON") from exc
-
-  def send_json(self, payload: dict, code: int | None = None):
-    if code is None:
-      code = {
-          "error": 400,
-          "missing": 404,
-          "unsupported": 422,
-          "confirmation_required": 428,
-      }.get(payload.get("status"), 200)
-    body = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
-    self.send_response(code)
-    self.send_header("Content-Type", "application/json; charset=utf-8")
-    self.send_header("Content-Length", str(len(body)))
-    self.end_headers()
-    self.wfile.write(body)
-
-  def end_headers(self):
-    self.send_header("Cache-Control", "no-store")
-    self.send_header("X-Content-Type-Options", "nosniff")
-    self.send_header("X-Frame-Options", "DENY")
-    self.send_header("Referrer-Policy", "no-referrer")
-    self.send_header("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
-    super().end_headers()
-
-  def log_message(self, format, *args):
-    return
 
 
 def main():
-  mimetypes.add_type("application/javascript; charset=utf-8", ".js")
-  mimetypes.add_type("text/css; charset=utf-8", ".css")
-  port = int(os.environ.get("MIRABOARD_PORT", "5178"))
-  server = ThreadingHTTPServer(("127.0.0.1", port), MiraBoardHandler)
-  print(f"MiraBoard: http://127.0.0.1:{port}")
-  print(f"Mira root: {MIRA_ROOT}")
-  server.serve_forever()
+    mimetypes.add_type("application/javascript; charset=utf-8", ".js")
+    mimetypes.add_type("text/css; charset=utf-8", ".css")
+    port = int(os.environ.get("MIRABOARD_PORT", "5178"))
+    server = ThreadingHTTPServer(("127.0.0.1", port), MiraBoardHandler)
+    print(f"MiraBoard: http://127.0.0.1:{port}")
+    print(f"Mira root: {MIRA_ROOT}")
+    server.serve_forever()
 
 
 if __name__ == "__main__":
-  main()
+    main()
