@@ -1,5 +1,7 @@
 const requiredClientModules = [
   ["MiraBoardSecurity", "frontend_security.js"],
+  ["MiraBoardContracts", "frontend_contracts.js"],
+  ["MiraBoardCache", "frontend_cache.js"],
   ["MiraBoardDataUtils", "data_utils.js"],
   ["MiraBoardMarkdown", "markdown_renderer.js"],
 ];
@@ -35,12 +37,15 @@ if (missingClientModules.length) {
   throw new Error(`MiraBoard client modules missing: ${missingClientModules.map(([, file]) => file).join(", ")}`);
 }
 
-const { escapeHtml } = globalThis.MiraBoardSecurity;
+const { escapeHtml, safeExternalUrl } = globalThis.MiraBoardSecurity;
+const { assertReadContract, assertOperationContract } = globalThis.MiraBoardContracts;
+const { readSnapshot, writeSnapshot } = globalThis.MiraBoardCache;
 const { parseCsv, csvNumberOrNull } = globalThis.MiraBoardDataUtils;
 const { buildMemoSummaryMarkdown, renderMarkdownPreview } = globalThis.MiraBoardMarkdown;
 
 const navItems = [
   ["overview", "研", "研究总览"],
+  ["feed", "流", "信息流"],
   ["portfolio", "益", "投资收益"],
   ["library", "资", "资料库"],
   ["sources", "源", "数据源状态"],
@@ -148,6 +153,9 @@ const activity = [
 
 const bootstrapMeta = {};
 let providerStatusData = { status: "unavailable", providers: {} };
+let operationCatalogData = { status: "unavailable", operations: [] };
+let marketCalendarData = null;
+let marketCalendarPromise = null;
 let portfolioPerformanceData = null;
 let portfolioPositionReviewData = { status: "missing", reviews: [] };
 let selectedObjectIndex = 0;
@@ -164,23 +172,32 @@ let marketSessionData = null;
 let portfolioDailyProfitReady = false;
 let portfolioDailyProfitSourceDate = "";
 let pendingPreviewConfirmation = null;
+let marketPulseData = { status: "unavailable", items: [], message: "金融市场数据尚未读取。" };
+const researchFeedData = {
+  held: { status: "idle", items: [] },
+  watchlist: { status: "idle", items: [] },
+};
+let activeFeedScope = "held";
 const HIDDEN_LIBRARY_KEY = "miraboard.hiddenMethodologyDocs.v1";
 const PORTFOLIO_REFRESH_STATE_KEY = "miraboard.portfolioRefreshState.v1";
+const APP_SNAPSHOT_CACHE_KEY = "miraboard.appSnapshot.v1";
+const APP_SNAPSHOT_CACHE_VERSION = 1;
 
 const portfolioPositions = [
   { account: "stock", code: "601898.SH", displayCode: "601898", name: "中煤能源", quantity: 30300, cost: 17.296, price: 12.510, marketValue: 379053.00, costBasis: 524083.64, profit: -145030.64, previousClose: null },
   { account: "stock", code: "002128.SZ", displayCode: "002128", name: "电投能源", quantity: 11100, cost: 29.603, price: 23.980, marketValue: 266178.00, costBasis: 328593.97, profit: -62415.97, previousClose: null },
-  { account: "stock", code: "600276.SH", displayCode: "600276", name: "恒瑞医药", quantity: 4400, cost: 52.000, price: 52.000, marketValue: 228800.00, costBasis: 228800.00, profit: 0.00, previousClose: null },
+  { account: "stock", code: "600276.SH", displayCode: "600276", name: "恒瑞医药", quantity: 6400, cost: 53.53320625, price: 57.040, marketValue: 365056.00, costBasis: 342612.52, profit: 22443.48, previousClose: 55.610, financing: true, financingPrincipal: 113812.52 },
+  { account: "stock", code: "002714.SZ", displayCode: "002714", name: "牧原股份", quantity: 3000, cost: 38.83388333, price: 38.100, marketValue: 114300.00, costBasis: 116501.65, profit: -2201.65, previousClose: 37.110, financing: true, financingPrincipal: 116501.65 },
   { account: "stock", code: "159992.SZ", displayCode: "159992", name: "创新药", quantity: 318200, cost: 0.773, price: 0.753, marketValue: 239604.60, costBasis: 245993.20, profit: -6388.60, previousClose: null },
-  { account: "option", code: "10011641", underlying: "588000", name: "沪-科创50购9月2100", optionType: "认购", quantity: 15, cost: 0.14085, price: 0.19440, marketValue: 29160.00, costBasis: 21127.50, profit: 8032.50, previousClose: null, multiplier: 10000 },
-  { account: "option", code: "10011041", underlying: "588000", name: "沪-科创50沽9月1800", optionType: "认沽", quantity: 20, cost: 0.13665, price: 0.10840, marketValue: 21680.00, costBasis: 27330.00, profit: -5650.00, previousClose: null, multiplier: 10000 },
-  { account: "option", code: "10011563", underlying: "588000", name: "沪-科创50沽9月1900", optionType: "认沽", quantity: 20, cost: 0.18345, price: 0.14750, marketValue: 29500.00, costBasis: 36690.00, profit: -7190.00, previousClose: null, multiplier: 10000 },
-  { account: "option", code: "10011752", underlying: "588000", name: "沪-科创50沽7月2100", optionType: "认沽", quantity: 11, cost: 0.09540, price: 0.09540, marketValue: 10494.00, costBasis: 10494.00, profit: 0.00, previousClose: null, multiplier: 10000 },
-  { account: "option", code: "10011035", underlying: "588000", name: "沪-科创50沽9月1500", optionType: "认沽", quantity: 71, cost: 0.05219, price: 0.03450, marketValue: 24495.00, costBasis: 37052.83, profit: -12557.83, previousClose: null, multiplier: 10000 },
+  { account: "option", code: "10011641", underlying: "588000", name: "沪-科创50购9月2100", optionType: "认购", quantity: 15, cost: 0.14085, price: 0.30790, marketValue: 46185.00, costBasis: 21127.50, profit: 25057.50, previousClose: 0.30620, multiplier: 10000 },
+  { account: "option", code: "10011041", underlying: "588000", name: "沪-科创50沽9月1800", optionType: "认沽", quantity: 20, cost: 0.13665, price: 0.04930, marketValue: 9860.00, costBasis: 27330.00, profit: -17470.00, previousClose: 0.05500, multiplier: 10000 },
+  { account: "option", code: "10011563", underlying: "588000", name: "沪-科创50沽9月1900", optionType: "认沽", quantity: 20, cost: 0.18345, price: 0.07250, marketValue: 14500.00, costBasis: 36690.00, profit: -22190.00, previousClose: 0.07830, multiplier: 10000 },
+  { account: "option", code: "10011035", underlying: "588000", name: "沪-科创50沽9月1500", optionType: "认沽", quantity: 71, cost: 0.05219, price: 0.01330, marketValue: 9443.00, costBasis: 37052.83, profit: -27609.83, previousClose: 0.01530, multiplier: 10000 },
+  { account: "option", code: "90007593", underlying: "159919", name: "深-沪深300ETF沽7月4800", optionType: "认沽", quantity: 40, cost: 0.00940, price: 0.00620, marketValue: 2480.00, costBasis: 3760.00, profit: -1280.00, previousClose: 0.00810, multiplier: 10000, quoteNote: "Greeks source_gap: Sina returned invalid IV/Delta/Gamma" },
 ];
 const portfolioAccounts = {
-  stock: { totalAssets: 1117153.92, marketValue: 1113635.60, cash: 3518.32, profit: -237744.84 },
-  option: { totalAssets: 115952.53, marketValue: 115329.00, cash: 623.53, initialCapital: 100000.00, profit: 15952.53 },
+  stock: { totalAssets: 1283826.38, marketValue: 1410786.40, cash: 0.00, profit: -146998.58, financingLiability: 226960.02, financingInterest: null },
+  option: { totalAssets: 83039.53, marketValue: 82468.00, cash: 571.53, initialCapital: 100000.00, profit: -16960.47 },
 };
 const portfolioAdditionalCash = 100000.00;
 const portfolioCash = portfolioAccounts.stock.cash + portfolioAccounts.option.cash + portfolioAdditionalCash;
@@ -190,20 +207,21 @@ const trackedEtfs = [
 ];
 
 async function loadBootstrap() {
-  const sources = ["/api/bootstrap", "./data/bootstrap.json"];
+  const sources = ["/api/read/bootstrap", "./data/bootstrap.json"];
 
   for (const source of sources) {
     try {
       const response = await fetchWithTimeout(source, { cache: "no-store" }, 5000);
       if (!response.ok) continue;
-      const data = await response.json();
+      const rawData = await response.json();
+      const data = source.startsWith("/api/") ? assertReadContract(rawData, "bootstrap") : rawData;
       replaceArray(navItems, data.navItems);
       replaceArray(objects, data.objects);
       replaceLibraryDocs(data.libraryDocs);
       replaceArray(deepReports, data.deepReports);
       replaceArray(objectLibraryFiles, data.objectLibraryFiles);
       replaceArray(activity, data.activity);
-      Object.assign(bootstrapMeta, data.meta || {}, { loadedFrom: source });
+      Object.assign(bootstrapMeta, data.meta || {}, { loadedFrom: source, apiConnected: source.startsWith("/api/") });
       integrateIndustryAnalysisObjects();
       ensurePortfolioHoldingsInObjects();
       return;
@@ -212,7 +230,7 @@ async function loadBootstrap() {
     }
   }
 
-  Object.assign(bootstrapMeta, { loadedFrom: "embedded-fallback" });
+  Object.assign(bootstrapMeta, { loadedFrom: "embedded-fallback", apiConnected: false });
   integrateIndustryAnalysisObjects();
   ensurePortfolioHoldingsInObjects();
 }
@@ -242,10 +260,37 @@ function integrateIndustryAnalysisObjects() {
   navItems.splice(0, navItems.length, ...navItems.filter(item => item[0] !== "industry"));
 }
 
+async function loadMarketCalendar() {
+  if (marketCalendarPromise) return marketCalendarPromise;
+  marketCalendarPromise = (async () => {
+    const sources = ["/api/read/market-calendar", "./data/a-share-market-calendar.json"];
+    for (const source of sources) {
+      try {
+        const response = await fetchWithTimeout(source, { cache: "no-store" }, 5000);
+        if (!response.ok) continue;
+        const rawData = await response.json();
+        marketCalendarData = source.startsWith("/api/")
+          ? assertReadContract(rawData, "market-calendar")
+          : rawData;
+        return marketCalendarData;
+      } catch {
+        // Continue to the offline copy. Unknown calendars must remain explicit.
+      }
+    }
+    marketCalendarData = { status: "missing", years: {} };
+    return marketCalendarData;
+  })();
+  return marketCalendarPromise;
+}
+
 async function loadMarketSession() {
   try {
-    marketSessionData = await fetchJsonWithTimeout("/api/market-session", {}, 5000);
+    marketSessionData = assertReadContract(
+      await fetchJsonWithTimeout("/api/read/market-session", {}, 5000),
+      "market-session",
+    );
   } catch {
+    await loadMarketCalendar();
     marketSessionData = buildLocalMarketSessionFallback();
   }
   return marketSessionData;
@@ -274,13 +319,10 @@ function formatBeijingTime(date = new Date(), includeDate = true) {
 function buildLocalMarketSessionFallback(now = new Date()) {
   const parts = beijingDateParts(now);
   const marketDate = `${parts.year}-${parts.month}-${parts.day}`;
-  const holidayRanges = [
-    ["2026-01-01", "2026-01-03"], ["2026-02-15", "2026-02-23"],
-    ["2026-04-04", "2026-04-06"], ["2026-05-01", "2026-05-05"],
-    ["2026-06-19", "2026-06-21"], ["2026-09-25", "2026-09-27"],
-    ["2026-10-01", "2026-10-07"],
-  ];
-  const calendarKnown = parts.year === "2026";
+  const holidayRanges = Array.isArray(marketCalendarData?.years?.[parts.year])
+    ? marketCalendarData.years[parts.year]
+    : [];
+  const calendarKnown = holidayRanges.length > 0;
   const isWeekend = parts.weekday === "Sat" || parts.weekday === "Sun";
   const isHoliday = holidayRanges.some(([start, end]) => marketDate >= start && marketDate <= end);
   const isTradingDay = calendarKnown && !isWeekend && !isHoliday;
@@ -308,6 +350,7 @@ function buildLocalMarketSessionFallback(now = new Date()) {
     phase,
     expectedQuoteDate,
     autoRefreshAllowed: isTradingDay && phase === "closed",
+    archiveAllowed: calendarKnown && phase !== "trading" && phase !== "calendar_unknown" && Boolean(expectedQuoteDate),
     message: messages[phase],
   };
 }
@@ -326,25 +369,79 @@ function previousLocalAShareTradingDate(marketDate, holidayRanges) {
 
 async function loadProviderStatus() {
   try {
-    providerStatusData = await fetchJson("/api/provider-status");
+    providerStatusData = await fetchReadJson("/api/read/provider-status", "provider-status");
   } catch (error) {
     providerStatusData = { status: "unavailable", message: error.message, providers: {} };
   }
 }
 
+async function loadMarketPulse() {
+  try {
+    marketPulseData = await fetchReadJson("/api/read/market-pulse", "market-pulse");
+  } catch (error) {
+    marketPulseData = { status: "unavailable", items: [], message: `金融市场数据不可用：${error.message}` };
+  }
+  return marketPulseData;
+}
+
+function holdingFeedSymbols() {
+  const symbols = new Set();
+  portfolioPositions.forEach(position => {
+    const code = position.account === "option" ? position.underlying : position.code;
+    const normalized = normalizePortfolioCode(code, "stock");
+    if (normalized) symbols.add(normalized);
+  });
+  return [...symbols];
+}
+
+function watchlistFeedSymbols() {
+  const holdings = new Set(holdingFeedSymbols());
+  return objects
+    .map(object => String(object.ticker || "").trim().toUpperCase())
+    .filter(symbol => symbol && !holdings.has(symbol))
+    .slice(0, 12);
+}
+
+async function loadResearchFeed(scope = activeFeedScope) {
+  const symbols = scope === "held" ? holdingFeedSymbols() : watchlistFeedSymbols();
+  if (!symbols.length) {
+    researchFeedData[scope] = { status: "source_gap", items: [], message: "当前范围没有可用于行业新闻关联的标的。" };
+    renderResearchFeed();
+    return researchFeedData[scope];
+  }
+  researchFeedData[scope] = { status: "loading", items: [], message: "正在读取关联行业新闻…" };
+  renderResearchFeed();
+  try {
+    researchFeedData[scope] = await fetchReadJson(`/api/read/research-feed?symbols=${encodeURIComponent(symbols.join(","))}`, "research-feed");
+  } catch (error) {
+    researchFeedData[scope] = { status: "unavailable", items: [], message: `行业新闻不可用：${error.message}` };
+  }
+  renderResearchFeed();
+  return researchFeedData[scope];
+}
+
 async function loadPositionReviews() {
   try {
-    portfolioPositionReviewData = await fetchJson("/api/position-reviews");
+    portfolioPositionReviewData = await fetchReadJson("/api/read/position-reviews", "position-reviews");
   } catch (error) {
     portfolioPositionReviewData = { status: "missing", message: error.message, reviews: [] };
   }
+}
+
+async function loadOperationCatalog() {
+  try {
+    operationCatalogData = await fetchReadJson("/api/read/operations", "operations-catalog");
+  } catch (error) {
+    operationCatalogData = { status: "unavailable", message: error.message, operations: [] };
+  }
+  return operationCatalogData;
 }
 
 async function syncResearchObjects() {
   if (researchSyncInFlight) return false;
   researchSyncInFlight = true;
   try {
-    const payload = await fetchJson("/api/bootstrap");
+    const payload = await fetchReadJson("/api/read/bootstrap", "bootstrap");
     if (!Array.isArray(payload.objects)) return false;
 
     const selected = getSelectedObject();
@@ -362,7 +459,7 @@ async function syncResearchObjects() {
     replaceArray(deepReports, payload.deepReports);
     replaceArray(objectLibraryFiles, payload.objectLibraryFiles);
     replaceArray(activity, payload.activity);
-    Object.assign(bootstrapMeta, payload.meta || {}, { loadedFrom: "/api/bootstrap" });
+    Object.assign(bootstrapMeta, payload.meta || {}, { loadedFrom: "/api/read/bootstrap", apiConnected: true });
     ensurePortfolioHoldingsInObjects();
 
     const nextSelectedIndex = objects.findIndex(object => (object.path || object.ticker || "") === selectedKey);
@@ -382,6 +479,7 @@ async function syncResearchObjects() {
       renderDetailShell();
       renderReader(getActiveMemoTab());
     }
+    persistAppSnapshot("data_source_refresh");
     return true;
   } catch {
     return false;
@@ -513,12 +611,45 @@ async function loadOverviewQuoteArchive() {
     overviewQuoteArchiveDate = latestDate;
     overviewQuoteArchiveRows = rows.filter(row => row.archive_date === latestDate);
     applyOverviewQuoteArchiveRows(overviewQuoteArchiveRows);
+    await loadOverviewMiraLevelsForArchive(overviewQuoteArchiveRows);
     if (statusNode) statusNode.textContent = latestDate ? `本地行情 · ${latestDate}` : "暂无本地行情";
     return overviewQuoteArchiveRows;
   } catch {
     overviewQuoteArchiveDate = "";
     overviewQuoteArchiveRows = [];
     if (statusNode) statusNode.textContent = "暂无本地行情";
+    return [];
+  }
+}
+
+async function loadOverviewMiraLevelsForArchive(rows) {
+  const targets = rows
+    .filter(row => row.symbol)
+    .map(row => ({
+      symbol: row.symbol,
+      market: row.market || "",
+      price: csvNumberOrNull(row.price),
+    }));
+  if (!targets.length) return [];
+  try {
+    const symbols = targets.map(row => encodeURIComponent(row.symbol)).join(",");
+    const markets = targets.map(row => encodeURIComponent(row.market)).join(",");
+    const prices = targets.map(row => row.price == null ? "" : encodeURIComponent(String(row.price))).join(",");
+    const payload = await fetchReadJson(`/api/read/mira-levels?symbols=${symbols}&markets=${markets}&prices=${prices}`, "mira-levels", { timeoutMs: 10000 });
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    items.forEach(item => {
+      const key = normalizePortfolioCode(item.symbol, "stock");
+      const object = objects.find(candidate => normalizePortfolioCode(candidate.ticker, "stock") === key);
+      if (!object || !Array.isArray(item.miraLevels)) return;
+      object.quote = {
+        ...(object.quote || {}),
+        miraLevels: item.miraLevels,
+        miraLevelSource: "mira_files",
+      };
+    });
+    return items;
+  } catch (error) {
+    Object.assign(bootstrapMeta, { miraLevelWarning: error.message });
     return [];
   }
 }
@@ -598,6 +729,104 @@ function replaceLibraryDocs(data) {
   libraryDocs.splice(0, libraryDocs.length, ...data);
 }
 
+function buildAppSnapshotData({ compact = false } = {}) {
+  const cachedObjects = objects.map(object => {
+    if (!compact || !object?.quote?.history) return object;
+    const quote = { ...object.quote };
+    delete quote.history;
+    return { ...object, quote };
+  });
+  return {
+    navItems,
+    objects: cachedObjects,
+    libraryDocs,
+    deepReports,
+    objectLibraryFiles,
+    activity,
+    bootstrapMeta,
+    overviewQuoteArchiveRows,
+    overviewQuoteArchiveDate,
+    overviewPriceHistoryRows: compact ? [] : overviewPriceHistoryRows,
+    portfolioPositions,
+    portfolioAccounts,
+    portfolioPerformanceData,
+    portfolioPositionReviewData,
+    portfolioDailyProfitReady,
+    portfolioDailyProfitSourceDate,
+    providerStatusData,
+    operationCatalogData,
+    marketCalendarData,
+    marketSessionData,
+    marketPulseData,
+    researchFeedData,
+    activeFeedScope,
+    selectedObjectIndex,
+  };
+}
+
+function persistAppSnapshot(reason = "manual_refresh") {
+  let result = writeSnapshot(
+    localStorage,
+    APP_SNAPSHOT_CACHE_KEY,
+    APP_SNAPSHOT_CACHE_VERSION,
+    buildAppSnapshotData(),
+    { reason },
+  );
+  if (!result.ok) {
+    result = writeSnapshot(
+      localStorage,
+      APP_SNAPSHOT_CACHE_KEY,
+      APP_SNAPSHOT_CACHE_VERSION,
+      buildAppSnapshotData({ compact: true }),
+      { reason, compact: true },
+    );
+  }
+  return result.ok;
+}
+
+function restoreAppSnapshot() {
+  const snapshot = readSnapshot(localStorage, APP_SNAPSHOT_CACHE_KEY, APP_SNAPSHOT_CACHE_VERSION);
+  const data = snapshot?.data;
+  if (!data || !Array.isArray(data.objects) || !data.objects.length) return null;
+
+  replaceArray(navItems, data.navItems);
+  replaceArray(objects, data.objects);
+  replaceLibraryDocs(data.libraryDocs);
+  replaceArray(deepReports, data.deepReports);
+  replaceArray(objectLibraryFiles, data.objectLibraryFiles);
+  replaceArray(activity, data.activity);
+  replaceArray(overviewQuoteArchiveRows, data.overviewQuoteArchiveRows);
+  replaceArray(overviewPriceHistoryRows, data.overviewPriceHistoryRows);
+  replaceArray(portfolioPositions, data.portfolioPositions);
+  Object.assign(portfolioAccounts, data.portfolioAccounts || {});
+  Object.assign(bootstrapMeta, data.bootstrapMeta || {}, {
+    loadedFrom: "local-cache",
+    cacheSavedAt: snapshot.savedAt || "",
+    cacheReason: snapshot.reason || "",
+  });
+  overviewQuoteArchiveDate = data.overviewQuoteArchiveDate || "";
+  portfolioPerformanceData = data.portfolioPerformanceData || null;
+  portfolioPositionReviewData = data.portfolioPositionReviewData || { status: "missing", reviews: [] };
+  portfolioDailyProfitReady = data.portfolioDailyProfitReady === true;
+  portfolioDailyProfitSourceDate = data.portfolioDailyProfitSourceDate || "";
+  providerStatusData = data.providerStatusData || providerStatusData;
+  operationCatalogData = data.operationCatalogData || operationCatalogData;
+  marketCalendarData = data.marketCalendarData || marketCalendarData;
+  marketSessionData = data.marketSessionData || marketSessionData;
+  marketPulseData = data.marketPulseData || marketPulseData;
+  if (data.researchFeedData) Object.assign(researchFeedData, data.researchFeedData);
+  activeFeedScope = data.activeFeedScope === "watchlist" ? "watchlist" : "held";
+  selectedObjectIndex = Math.max(0, Math.min(Number(data.selectedObjectIndex || 0), objects.length - 1));
+  ensurePortfolioHoldingsInObjects();
+  return snapshot;
+}
+
+function cachedSnapshotLabel(snapshot) {
+  const savedAt = snapshot?.savedAt ? new Date(snapshot.savedAt) : null;
+  if (!savedAt || Number.isNaN(savedAt.getTime())) return "已载入上次缓存";
+  return `上次缓存 · ${savedAt.toLocaleString("zh-CN", { hour12: false, timeZone: "Asia/Shanghai" })}`;
+}
+
 function renderNav() {
   const nav = document.getElementById("navList");
   nav.innerHTML = navItems.map(([id, icon, label]) => `
@@ -622,6 +851,11 @@ function setView(view) {
   title.textContent = view === "overview" ? "今日研究状态" : labels[view];
   if (view === "overview") {
     document.getElementById("overviewView").classList.add("active");
+  } else if (view === "feed") {
+    document.getElementById("feedView").classList.add("active");
+    renderMarketPulse();
+    renderResearchFeed();
+    if (researchFeedData[activeFeedScope].status === "idle") loadResearchFeed(activeFeedScope);
   } else if (view === "radar") {
     document.getElementById("radarView").classList.add("active");
   } else if (view === "portfolio") {
@@ -670,7 +904,13 @@ function applyQuoteToLinkedState(symbol, quote, account = "") {
   const object = objects.find(item => normalizePortfolioCode(item.ticker, "stock") === key);
   if (object) {
     const localHistory = object.quote?.history;
-    object.quote = localHistory?.length && !quote.history ? { ...quote, history: localHistory, historyProvider: object.quote.historyProvider } : quote;
+    const localLevels = Array.isArray(object.quote?.miraLevels) ? object.quote.miraLevels : [];
+    const nextQuote = Array.isArray(quote.miraLevels) && quote.miraLevels.length
+      ? quote
+      : localLevels.length
+      ? { ...quote, miraLevels: localLevels, miraLevelSource: object.quote?.miraLevelSource || "mira_files" }
+      : quote;
+    object.quote = localHistory?.length && !nextQuote.history ? { ...nextQuote, history: localHistory, historyProvider: object.quote.historyProvider } : nextQuote;
     applyQuoteToDetailSummary(object, object.quote);
   }
 
@@ -866,6 +1106,7 @@ function portfolioSnapshot(filter = getActivePortfolioFilter()) {
   const profit = positions.reduce((sum, position) => sum + portfolioProfit(position), 0);
   const costBasis = positionCostBasis;
   const cash = portfolioCashForFilter(filter);
+  const financingLiability = filter === "option" ? 0 : Number(portfolioAccounts.stock.financingLiability || 0);
   const dailyProfit = computePortfolioDailyProfit(filter);
   return {
     positions,
@@ -873,7 +1114,8 @@ function portfolioSnapshot(filter = getActivePortfolioFilter()) {
     costBasis,
     profit,
     cash,
-    totalAssets: marketValue + cash,
+    financingLiability,
+    totalAssets: marketValue + cash - financingLiability,
     totalReturn: costBasis ? profit / costBasis * 100 : null,
     dailyProfit: Number.isFinite(dailyProfit) ? dailyProfit : null,
   };
@@ -920,7 +1162,7 @@ async function syncPortfolioBenchmarkToLatest() {
   const benchmark = portfolioPerformanceData?.benchmark;
   if (!benchmark || !Array.isArray(benchmark.series)) return false;
   try {
-    const quote = await fetchJsonWithTimeout("/api/quote?symbol=000300.SH&market=A%E8%82%A1", {}, 12000);
+    const quote = await fetchReadJson("/api/read/quote?symbol=000300.SH&market=A%E8%82%A1", "quote", { timeoutMs: 12000 });
     if (quote?.status !== "ok" || !Array.isArray(quote.history)) return false;
     const knownDates = new Set(benchmark.series.map(point => point.date));
     quote.history.forEach(point => {
@@ -1235,8 +1477,11 @@ function renderPortfolioMetrics(filter = "all") {
   const snapshot = portfolioSnapshot(filter);
   const profitNote = "当前未平仓持仓市值 - 账户快照成本基数；不含已平仓损益";
   const returnNote = "当前持仓盈亏 ÷ 当前未平仓持仓成本基数";
+  const assetNote = snapshot.financingLiability > 0
+    ? "持仓市值 + 可用资金 - 融资负债本金"
+    : "持仓市值 + 可用资金";
   const metrics = [
-    ["账户总资产", snapshot.totalAssets, "持仓市值 + 可用资金", ""],
+    ["账户总资产", snapshot.totalAssets, assetNote, ""],
     ["当前持仓盈亏", snapshot.profit, profitNote, snapshot.profit >= 0 ? "positive" : "negative"],
     ["当前持仓收益率", snapshot.totalReturn, returnNote, snapshot.totalReturn >= 0 ? "positive" : "negative", "percent"],
     ["今日收益", snapshot.dailyProfit, snapshot.dailyProfit == null ? "行情刷新后可计算" : "按已刷新股票和期权行情计算", snapshot.dailyProfit >= 0 ? "positive" : "negative"],
@@ -1511,13 +1756,15 @@ function renderPortfolioHoldings(filter = "all") {
   body.innerHTML = rows.map(position => {
     const daily = portfolioDailyProfit(position);
     const total = portfolioProfit(position);
+    const costBasis = Number(position.costBasis || 0);
+    const holdingReturn = costBasis > 0 ? total / costBasis * 100 : null;
     const priceDecimals = position.account === "option" ? 4 : 3;
     const priceDisplay = position.quoteStatus === "failed"
       ? `<span class="portfolio-price-missing" title="${escapeHtml(position.quoteError || "本轮行情未返回")}">未接入</span>`
       : `<strong>${formatPortfolioMoney(position.price, priceDecimals)}</strong>`;
     return `
       <tr>
-        <td><strong>${escapeHtml(position.name)}</strong><span>${escapeHtml(position.displayCode || position.code)}</span></td>
+        <td><strong>${escapeHtml(position.name)}${position.financing ? '<em class="position-financing-tag">融资</em>' : ""}</strong><span>${escapeHtml(position.displayCode || position.code)}</span></td>
         <td><span class="pill ${position.account === "stock" ? "blue" : "muted"}">${position.account === "stock" ? "股票" : escapeHtml(position.optionType)}</span></td>
         <td class="number-cell">${formatPortfolioMoney(position.quantity, 0)}${position.account === "option" ? " 张" : " 股"}</td>
         <td class="number-cell">${formatPortfolioMoney(position.cost, priceDecimals)}</td>
@@ -1526,7 +1773,7 @@ function renderPortfolioHoldings(filter = "all") {
         <td class="number-cell ${daily == null ? "muted-change" : daily >= 0 ? "positive" : "negative"}">${daily == null ? "--" : formatPortfolioSigned(daily)}</td>
         <td class="number-cell portfolio-profit-cell ${total >= 0 ? "positive" : "negative"}">
           <strong>${formatPortfolioSigned(total)}</strong>
-          <span>${formatPortfolioMoney(portfolioMarketValue(position))} − ${formatPortfolioMoney(Number(position.costBasis || 0))}</span>
+          <span>${holdingReturn == null ? "收益率待计算" : `收益率 ${holdingReturn > 0 ? "+" : ""}${holdingReturn.toFixed(2)}%`}</span>
         </td>
       </tr>`;
   }).join("");
@@ -1539,19 +1786,21 @@ function renderPortfolioAllocation(filter = "all") {
   const stockValue = positions.filter(item => item.account === "stock").reduce((sum, item) => sum + portfolioMarketValue(item), 0);
   const optionValue = positions.filter(item => item.account === "option").reduce((sum, item) => sum + portfolioMarketValue(item), 0);
   const cash = portfolioCashForFilter(filter);
+  const financingLiability = filter === "option" ? 0 : Number(portfolioAccounts.stock.financingLiability || 0);
   const total = stockValue + optionValue + cash;
   const rows = [
-    ["股票持仓", stockValue, "stock"],
-    ["期权持仓", optionValue, "option"],
-    ["可用资金", cash, "cash"],
+    ["股票持仓", stockValue, "stock", false],
+    ["期权持仓", optionValue, "option", false],
+    ["可用资金", cash, "cash", false],
+    ["融资负债本金", financingLiability, "liability", true],
   ].filter(([, value]) => value > 0);
-  container.innerHTML = rows.map(([label, value, tone]) => {
+  container.innerHTML = rows.map(([label, value, tone, isLiability]) => {
     const percent = total ? value / total * 100 : 0;
     return `
       <div class="allocation-row">
         <div><span>${label}</span><strong>${percent.toFixed(1)}%</strong></div>
         <div class="allocation-track"><i class="${tone}" style="width:${percent.toFixed(1)}%"></i></div>
-        <em>${formatPortfolioMoney(value)} CNY</em>
+        <em>${isLiability ? "−" : ""}${formatPortfolioMoney(value)} CNY</em>
       </div>`;
   }).join("");
 }
@@ -1721,10 +1970,10 @@ async function refreshPortfolioPrices(options = {}) {
         if (target.account !== "option") return "";
         return target.underlying || portfolioPositions.find(position => position.code === target.code)?.underlying || "";
       }).join(",");
-      const payload = await fetchJsonWithTimeout(
-        `/api/quotes?symbols=${encodeURIComponent(symbols)}&markets=${encodeURIComponent(markets)}&underlyings=${encodeURIComponent(underlyings)}`,
-        {},
-        group[0].target.account === "option" ? 120000 : 30000,
+      const payload = await fetchReadJson(
+        `/api/read/quotes?symbols=${encodeURIComponent(symbols)}&markets=${encodeURIComponent(markets)}&underlyings=${encodeURIComponent(underlyings)}`,
+        "quotes",
+        { timeoutMs: group[0].target.account === "option" ? 120000 : 30000 },
       );
       const groupQuotes = Array.isArray(payload?.quotes) ? payload.quotes : [];
       group.forEach(({ target, index }, groupIndex) => {
@@ -1745,10 +1994,10 @@ async function refreshPortfolioPrices(options = {}) {
     const underlyingCodes = [...new Set(quotes.map(quote => String(quote?.underlyingCode || "").trim()).filter(Boolean))];
     let underlyingQuotes = [];
     if (underlyingCodes.length) {
-      const underlyingPayload = await fetchJsonWithTimeout(
-        `/api/quotes?symbols=${encodeURIComponent(underlyingCodes.join(","))}&markets=${encodeURIComponent(underlyingCodes.map(() => "A股").join(","))}`,
-        {},
-        15000,
+      const underlyingPayload = await fetchReadJson(
+        `/api/read/quotes?symbols=${encodeURIComponent(underlyingCodes.join(","))}&markets=${encodeURIComponent(underlyingCodes.map(() => "A股").join(","))}`,
+        "quotes",
+        { timeoutMs: 15000 },
       );
       underlyingQuotes = Array.isArray(underlyingPayload?.quotes) ? underlyingPayload.quotes : [];
       underlyingCodes.forEach((code, index) => {
@@ -1775,7 +2024,7 @@ async function refreshPortfolioPrices(options = {}) {
       const stockSnapshot = portfolioSnapshot("stock");
       const seriesPoint = portfolioPerformanceData?.series?.find(point => point.date === sourceDates[0]);
       const benchmarkClose = portfolioPerformanceData?.benchmark?.series?.find(point => point.date === sourceDates[0])?.close ?? "";
-      await fetchJson("/api/portfolio-archive", {
+      await fetchOperationJson("/api/ops/portfolio-archive", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1885,7 +2134,7 @@ function renderCards(filter = "all") {
       <td class="number-cell"><strong class="research-change ${changeClass(formatQuoteChange(o))}">${escapeHtml(formatQuoteChange(o) || "—")}</strong></td>
       <td class="number-cell"><span class="research-volume-ratio">${escapeHtml(formatQuoteVolumeRatio(o))}</span></td>
       <td><span class="research-industry">${escapeHtml(formatQuoteIndustry(o))}</span></td>
-      <td><span class="research-trend ${isEmphasizedTrend(o) ? "trend-emphasis" : ""}">${escapeHtml(getCompactTrendText(o) || "待读取")}</span></td>
+      <td>${renderOverviewTrendCapsule(o)}</td>
       <td><span class="research-state" title="${escapeHtml(o.state || "")}">${escapeHtml(researchStateLabel(o.state))}</span></td>
       <td><span class="freshness-status ${o.stale === "stale" ? "red" : o.stale === "needs_refresh" ? "amber" : "green"}"><i></i>${refreshLabel(o.stale)}</span></td>
     </tr>`).join("");
@@ -1928,7 +2177,7 @@ function formatQuotePrice(object) {
   if (object.quote?.status === "ok" && object.quote.price != null) {
     return Number(object.quote.price).toFixed(2);
   }
-  if (bootstrapMeta.loadedFrom !== "/api/bootstrap") return "待接入";
+  if (!bootstrapMeta.apiConnected) return "待接入";
   return object.price || "待接入";
 }
 
@@ -1958,10 +2207,93 @@ function getCompactTrendText(object) {
   return firstClause.length > 22 ? `${firstClause.slice(0, 22)}…` : firstClause;
 }
 
+function renderOverviewTrendCapsule(object) {
+  const trendText = getCompactTrendText(object) || "待读取";
+  const levels = normalizeMiraLevels(object.quote?.miraLevels || []).slice(0, 6);
+  const currentPrice = overviewTrendCurrentPrice(object);
+  const selectedLevel = selectOverviewTrendLevel(levels, currentPrice);
+  if (!selectedLevel) {
+    const pendingTone = isEmphasizedTrend(object) ? "risk" : "pending";
+    return `
+      <div class="overview-trend-capsule ${pendingTone}" title="${escapeHtml(getMiraTrendText(object))}">
+        <b>${isEmphasizedTrend(object) ? "关键提醒" : "点位待读取"}</b>
+        <div class="overview-trend-rail" style="--trend-pos: 50%"><i></i></div>
+        <em>未解析</em>
+        <small>${escapeHtml(trendText)}</small>
+      </div>`;
+  }
+
+  const tone = overviewTrendToneClass(object, selectedLevel);
+  const position = overviewTrendRailPosition(levels, currentPrice, selectedLevel);
+  const label = overviewTrendCapsuleLabel(object, selectedLevel);
+  const range = formatMiraLevelRange(selectedLevel);
+  return `
+    <div class="overview-trend-capsule ${tone}" title="${escapeHtml(getMiraTrendText(object))}">
+      <b>${escapeHtml(label)}</b>
+      <div class="overview-trend-rail" style="--trend-pos: ${position}%"><i></i></div>
+      <em>${escapeHtml(range)}</em>
+      <small>${escapeHtml(trendText)}</small>
+    </div>`;
+}
+
+function overviewTrendCurrentPrice(object) {
+  const quotePrice = Number(object.quote?.price);
+  if (Number.isFinite(quotePrice)) return quotePrice;
+  const fallbackPrice = Number(object.price);
+  return Number.isFinite(fallbackPrice) ? fallbackPrice : null;
+}
+
+function selectOverviewTrendLevel(levels, currentPrice) {
+  if (!levels.length) return null;
+  if (!Number.isFinite(currentPrice)) return levels[0];
+  return levels
+    .map(level => ({
+      level,
+      distance: currentPrice >= level.low && currentPrice <= level.high
+        ? 0
+        : Math.min(Math.abs(currentPrice - level.low), Math.abs(currentPrice - level.high), Math.abs(currentPrice - level.value)),
+    }))
+    .sort((a, b) => a.distance - b.distance)[0]?.level || levels[0];
+}
+
+function overviewTrendRailPosition(levels, currentPrice, selectedLevel) {
+  const values = levels.flatMap(level => [level.low, level.high, level.value]);
+  const current = Number.isFinite(currentPrice) ? currentPrice : selectedLevel.value;
+  values.push(current);
+  let minValue = Math.min(...values);
+  let maxValue = Math.max(...values);
+  if (!Number.isFinite(minValue) || !Number.isFinite(maxValue) || minValue === maxValue) return 50;
+  const padding = (maxValue - minValue) * 0.12;
+  minValue -= padding;
+  maxValue += padding;
+  const percent = ((current - minValue) / (maxValue - minValue)) * 100;
+  return Math.max(6, Math.min(94, Math.round(percent)));
+}
+
+function overviewTrendToneClass(object, level) {
+  const label = String(level?.label || "");
+  if (label.includes("失效") || label.includes("跌破") || isEmphasizedTrend(object)) return "risk";
+  if (label.includes("确认") || label.includes("支撑") || label.includes("承接")) return "mira";
+  return "auto";
+}
+
+function overviewTrendCapsuleLabel(object, level) {
+  const trend = String(getMiraTrendText(object) || "");
+  const label = String(level?.label || "");
+  if (trend.includes("防守确认")) return "防守确认";
+  if (label.includes("失效") || label.includes("跌破")) return "失效位";
+  if (label.includes("确认")) return "趋势确认区";
+  if (label.includes("支撑") || label.includes("承接")) return "承接区";
+  if (label.includes("压力")) return "压力区";
+  return label || "走势点位";
+}
+
 function isEmphasizedTrend(object) {
   const trend = String(getMiraTrendText(object) || "").trim().toLowerCase();
-  if (/\b(?:uptrend_confirmed|downtrend_confirmed|reversal_attempt)\b/.test(trend)) return true;
-  return /上升趋势确认|上行确认|下降趋势确认|下行趋势确认|反转尝试|弱势下行\s*\/\s*防守确认/.test(trend);
+  if (!trend) return false;
+  if (/(?:尚无|未|待|没有|缺乏|不构成).{0,8}(?:确认|反转|突破)/.test(trend)) return false;
+  if (/\b(?:uptrend_confirmed|downtrend_confirmed|reversal_confirmed|breakout_confirmed|breakdown_confirmed|defense_confirmed|support_confirmed)\b/.test(trend)) return true;
+  return /上升趋势确认|上行确认|下降趋势确认|下行趋势确认|反转确认|反转已确认|趋势反转|突破确认|跌破确认|失效确认|防守确认|跌破|失效/.test(trend);
 }
 
 function quoteMetaLine(object) {
@@ -2130,7 +2462,16 @@ function attachRadarFocus() {
   });
 }
 
+function setOverviewRefreshStatus(message, tone = "muted") {
+  const status = document.getElementById("overviewQuoteStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.dataset.tone = tone;
+  status.setAttribute("aria-live", "polite");
+}
+
 async function showBatchPriceRefresh({ force = false } = {}) {
+  setOverviewRefreshStatus("正在同步研究标的…", "active");
   await syncResearchObjects();
   if (!marketSessionData) await loadMarketSession();
   const radar = document.getElementById("radarList");
@@ -2139,10 +2480,8 @@ async function showBatchPriceRefresh({ force = false } = {}) {
     .filter(({ object }) => object.ticker && ["A股", "ETF", "港股", "美股"].includes(object.market));
   const count = quoteObjects.length;
   const archiveDate = currentOverviewArchiveDate();
-  const canArchiveAfterClose = marketSessionData?.isTradingDay === true
-    && marketSessionData?.phase === "closed"
-    && marketSessionData?.autoRefreshAllowed === true;
-  const sameDayArchive = canArchiveAfterClose && overviewQuoteArchiveDate === archiveDate;
+  const canArchiveExpectedClose = marketSessionData?.archiveAllowed === true;
+  const sameDayArchive = canArchiveExpectedClose && overviewQuoteArchiveDate === archiveDate;
   const fetchTargets = force
     ? quoteObjects
     : sameDayArchive
@@ -2155,6 +2494,8 @@ async function showBatchPriceRefresh({ force = false } = {}) {
     renderDetailShell();
     renderPortfolio();
     prependActivity("price", "已读取本地股价", `${count}/${count} 个标的 · ${archiveDate} 已归档，不重复请求行情接口`);
+    setOverviewRefreshStatus(`已读取本地行情：${count}/${count} 个标的`, "ok");
+    persistAppSnapshot("price_refresh");
     return { status: "cached", count };
   }
   const batchRow = `
@@ -2163,9 +2504,10 @@ async function showBatchPriceRefresh({ force = false } = {}) {
       <span>${fetchTargets.length} 个待更新标的 · ${force ? "手动强制重取全部行情" : "其余读取本地 CSV"}</span>
     </div>`;
   if (radar) radar.innerHTML = batchRow + radar.innerHTML;
+  setOverviewRefreshStatus(`正在刷新 ${fetchTargets.length} 个标的行情…`, "active");
   const symbols = fetchTargets.map(({ object }) => encodeURIComponent(object.ticker)).join(",");
   const markets = fetchTargets.map(({ object }) => encodeURIComponent(object.market)).join(",");
-  const payload = await fetchJson(`/api/quotes?symbols=${symbols}&markets=${markets}`, { timeoutMs: 60000 });
+  const payload = await fetchReadJson(`/api/read/quotes?symbols=${symbols}&markets=${markets}`, "quotes", { timeoutMs: 60000 });
   (payload.quotes || []).forEach((quote, i) => {
     const source = fetchTargets[i];
     if (source) {
@@ -2178,7 +2520,7 @@ async function showBatchPriceRefresh({ force = false } = {}) {
     market: fetchTargets[index]?.object.market || quote.market,
     name: fetchTargets[index]?.object.name || "",
   }));
-  if (!canArchiveAfterClose) {
+  if (!canArchiveExpectedClose) {
     renderCards(getActiveOverviewFilter());
     renderTargets(getActiveTargetFilter());
     renderDetailShell();
@@ -2187,11 +2529,26 @@ async function showBatchPriceRefresh({ force = false } = {}) {
     prependActivity(
       "price",
       "全部股价已刷新（未归档）",
-      `${okCount}/${count} 个标的接入成功 · ${marketSessionData?.message || "A股尚未收盘"} · 未写入本地 CSV`,
+      `${okCount}/${count} 个标的接入成功 · ${marketSessionData?.message || "A股盘中"} · 未写入本地 CSV`,
     );
+    setOverviewRefreshStatus(`已刷新 ${okCount}/${count} 个标的；当前不归档`, okCount ? "ok" : "warn");
+    persistAppSnapshot("price_refresh");
     return { status: "refreshed_not_archived", count: okCount };
   }
-  const archiveResult = await fetchJson("/api/overview-quotes-archive", {
+  const incompleteSnapshot = archivedQuotes.filter(quote => ["A股", "ETF"].includes(quote.market)
+    && (quote.status !== "ok" || !Number.isFinite(Number(quote.price)) || quote.sourceDate !== archiveDate));
+  if (incompleteSnapshot.length) {
+    renderCards(getActiveOverviewFilter());
+    renderTargets(getActiveTargetFilter());
+    renderDetailShell();
+    renderPortfolio();
+    const symbols = incompleteSnapshot.map(quote => quote.symbol).filter(Boolean).slice(0, 6).join("、");
+    prependActivity("warn", "股价已刷新但快照不完整", `${symbols || "部分 A股/ETF"} 的数据日期或状态不满足 ${archiveDate} 收盘归档；已保留原本地 CSV`);
+    setOverviewRefreshStatus(`行情已获取，但 ${archiveDate} 收盘快照不完整；未覆盖本地 CSV`, "warn");
+    persistAppSnapshot("price_refresh");
+    return { status: "refreshed_not_archived", count: (payload.quotes || []).filter(quote => quote.status === "ok").length };
+  }
+  const archiveResult = await fetchOperationJson("/api/ops/overview-quotes-archive", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ archiveDate, quotes: archivedQuotes }),
@@ -2202,14 +2559,23 @@ async function showBatchPriceRefresh({ force = false } = {}) {
     renderDetailShell();
     renderPortfolio();
     prependActivity("warn", "股价已刷新但未归档", archiveResult.message || "收盘状态未通过服务端校验");
+    setOverviewRefreshStatus(`行情已获取，但归档未完成：${archiveResult.message || "请稍后重试"}`, "warn");
+    persistAppSnapshot("price_refresh");
     return { status: "refreshed_not_archived", count: (payload.quotes || []).filter(quote => quote.status === "ok").length };
   }
+  await loadOverviewQuoteArchive();
+  renderCards(getActiveOverviewFilter());
+  renderTargets(getActiveTargetFilter());
+  renderDetailShell();
+  renderPortfolio();
+  const archivedOkCount = quoteObjects.filter(({ object }) => overviewArchiveRowFor(object.ticker)?.status === "ok").length;
+  setOverviewRefreshStatus(`已刷新并归档 ${archivedOkCount}/${count} 个标的；正在补充历史行情…`, "active");
   const historySymbols = fetchTargets
     .map(({ object }) => object.ticker)
     .filter(symbol => /^\d{6}\.(SH|SZ|BJ)$/i.test(symbol));
   if (historySymbols.length) {
     try {
-      await fetchJson("/api/overview-history-refresh", {
+      await fetchOperationJson("/api/ops/overview-history-refresh", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ symbols: historySymbols, end: archiveDate }),
@@ -2227,13 +2593,15 @@ async function showBatchPriceRefresh({ force = false } = {}) {
   renderPortfolio();
   const okCount = quoteObjects.filter(({ object }) => overviewArchiveRowFor(object.ticker)?.status === "ok").length;
   prependActivity("price", "全部股价已归档", `${okCount}/${count} 个标的接入成功 · 已写入 overview-quotes.csv，不写入 Mira`);
+  setOverviewRefreshStatus(`刷新完成：${okCount}/${count} 个标的已归档`, okCount ? "ok" : "warn");
+  persistAppSnapshot("price_refresh");
   return { status: "refreshed", count: okCount };
 }
 
 async function fetchQuoteForObject(index = selectedObjectIndex) {
   const object = objects[index];
   if (!object) return null;
-  const quote = await fetchJson(`/api/quote?symbol=${encodeURIComponent(object.ticker)}&market=${encodeURIComponent(object.market || "")}`, { timeoutMs: 60000 });
+  const quote = await fetchReadJson(`/api/read/quote?symbol=${encodeURIComponent(object.ticker)}&market=${encodeURIComponent(object.market || "")}`, "quote", { timeoutMs: 60000 });
   applyQuoteToLinkedState(object.ticker, quote, "stock");
   renderCards(getActiveOverviewFilter());
   renderTargets(getActiveTargetFilter());
@@ -2245,7 +2613,7 @@ async function fetchQuoteForObject(index = selectedObjectIndex) {
 async function updateMarketForObject(index = selectedObjectIndex, confirmationToken = "") {
   const object = objects[index];
   if (!object) return null;
-  const payload = await fetchJson("/api/update-market", {
+  const payload = await fetchOperationJson("/api/ops/update-market", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -2284,13 +2652,14 @@ async function updateMarketForObject(index = selectedObjectIndex, confirmationTo
     renderActivity();
     if (document.getElementById("sourcesView")?.classList.contains("active")) renderSourceStatusView();
   }
+  if (["ok", "read_only", "existing"].includes(payload.status)) persistAppSnapshot("object_update");
   return payload;
 }
 
 async function updateNewsForObject(index = selectedObjectIndex, confirmationToken = "") {
   const object = objects[index];
   if (!object) return null;
-  const payload = await fetchJson("/api/update-news", {
+  const payload = await fetchOperationJson("/api/ops/update-news", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -2324,6 +2693,7 @@ async function updateNewsForObject(index = selectedObjectIndex, confirmationToke
     renderActivity();
     if (document.getElementById("sourcesView")?.classList.contains("active")) renderSourceStatusView();
   }
+  if (["ok", "existing"].includes(payload.status)) persistAppSnapshot("object_update");
   return payload;
 }
 
@@ -2355,6 +2725,14 @@ async function fetchJson(url, options = {}) {
     throw new Error(payload?.message || `请求失败（HTTP ${response.status}）`);
   }
   return payload;
+}
+
+async function fetchReadJson(url, contractName, options = {}) {
+  return assertReadContract(await fetchJson(url, options), contractName);
+}
+
+async function fetchOperationJson(url, options = {}) {
+  return assertOperationContract(await fetchJson(url, options));
 }
 
 async function fetchJsonWithTimeout(url, options = {}, timeoutMs = 15000) {
@@ -3063,11 +3441,11 @@ async function loadSourcePreview(file, container) {
   try {
     if (!payload) {
       const response = await fetchWithTimeout(
-        `/api/source-file?path=${encodeURIComponent(file.path)}`,
+        `/api/read/source-file?path=${encodeURIComponent(file.path)}`,
         { cache: "no-store" },
         15000
       );
-      payload = await response.json();
+      payload = assertReadContract(await response.json(), "source-file");
       sourcePreviewCache.set(cacheKey, payload);
     }
   } catch (error) {
@@ -3172,7 +3550,7 @@ async function openFullscreenPreview(path) {
 
   let payload = sourcePreviewCache.get(path);
   if (!payload) {
-    payload = await fetchJson(`/api/source-file?path=${encodeURIComponent(path)}`);
+    payload = await fetchReadJson(`/api/read/source-file?path=${encodeURIComponent(path)}`, "source-file");
     sourcePreviewCache.set(path, payload);
   }
   if (payload.status !== "ok") {
@@ -3224,23 +3602,40 @@ async function requestPreviewWriteConfirmation(payload) {
 
 function getSelectedObjectFiles() {
   const object = getSelectedObject();
+  if (!object) return [];
   const directFiles = Array.isArray(object.files) ? object.files : [];
   const industryFiles = Array.isArray(object.industryFiles) ? object.industryFiles : [];
-  if (directFiles.length || industryFiles.length) {
-    return [...directFiles, ...industryFiles];
-  }
   const ticker = String(object.ticker || "").toLowerCase();
   const objectName = String(object.name || "").toLowerCase();
-  if (!ticker && !objectName) return [];
-  return objectLibraryFiles
-    .filter(file => {
-      const path = String(file.path || "").toLowerCase();
-      return (ticker && path.includes(ticker)) || (objectName && path.includes(objectName));
-    })
-    .map(file => ({
-      ...file,
-      modifiedAt: null,
-    }));
+  const mergedByPath = new Map();
+  const mergeFile = file => {
+    const path = String(file?.path || "");
+    if (!path) return;
+    const existing = mergedByPath.get(path) || {};
+    const next = { ...existing };
+    Object.entries(file || {}).forEach(([key, value]) => {
+      if (!(key in next) || next[key] == null || next[key] === "" || (Array.isArray(next[key]) && next[key].length === 0)) {
+        next[key] = value;
+        return;
+      }
+      if (value == null || value === "" || (Array.isArray(value) && value.length === 0)) return;
+      if (["type", "summary", "date", "category", "industryAnalysis", "modifiedAt", "size"].includes(key)) {
+        next[key] = value;
+      }
+    });
+    mergedByPath.set(path, next);
+  };
+
+  [...directFiles, ...industryFiles].forEach(mergeFile);
+  if (ticker || objectName) {
+    objectLibraryFiles
+      .filter(file => {
+        const path = String(file.path || "").toLowerCase();
+        return (ticker && path.includes(ticker)) || (objectName && path.includes(objectName));
+      })
+      .forEach(mergeFile);
+  }
+  return [...mergedByPath.values()];
 }
 
 function getRankedObjectFiles() {
@@ -3492,10 +3887,19 @@ function shouldShowActivityItem(item) {
 
 function attachUpdateButtons() {
   document.getElementById("refreshAllPricesBtn").addEventListener("click", async () => {
+    const button = document.getElementById("refreshAllPricesBtn");
+    const originalMarkup = button.innerHTML;
+    setButtonBusy(button, true);
+    button.setAttribute("aria-busy", "true");
+    button.textContent = "刷新中…";
     try {
       await showBatchPriceRefresh({ force: true });
     } catch (error) {
       setUpdateStatus("warn", `全部股价刷新失败：${error.message}`);
+    } finally {
+      button.innerHTML = originalMarkup;
+      button.removeAttribute("aria-busy");
+      setButtonBusy(button, false);
     }
   });
   document.getElementById("priceUpdateBtn").addEventListener("click", async () => {
@@ -3590,7 +3994,15 @@ function attachUpdateButtons() {
     const button = document.getElementById("globalRefreshBtn");
     setButtonBusy(button, true);
     try {
-      const synced = await syncResearchObjects();
+      sourcePreviewCache.clear();
+      const [synced] = await Promise.all([
+        syncResearchObjects(),
+        loadProviderStatus(),
+        loadMarketPulse(),
+        loadMarketSession(),
+        loadPositionReviews(),
+        loadOperationCatalog(),
+      ]);
       const dueCount = objects.filter(object => ["stale", "needs_refresh"].includes(object.stale)).length;
       prependActivity(
         synced ? "price" : "warn",
@@ -3598,6 +4010,10 @@ function attachUpdateButtons() {
         synced ? `${objects.length} 个对象已接入 · ${dueCount} 个待刷新` : "保留当前看板数据"
       );
       renderUpdateQueue();
+      renderSourceStatus();
+      renderMarketPulse();
+      renderPortfolio();
+      persistAppSnapshot("data_source_refresh");
     } finally {
       setButtonBusy(button, false);
     }
@@ -3918,7 +4334,7 @@ function isReversalConfirmed(object) {
 function renderSourceStatus() {
   const footer = document.querySelector(".sidebar-footer div");
   if (!footer) return;
-  const source = bootstrapMeta.loadedFrom === "/api/bootstrap" ? "Local API" : "Local JSON";
+  const source = bootstrapMeta.apiConnected ? "Local API" : "Local JSON";
   footer.querySelector("strong").textContent = source;
   footer.querySelector("span").textContent = bootstrapMeta.researchIndexStatus
     ? `Mira index: ${bootstrapMeta.researchIndexStatus}`
@@ -3930,7 +4346,10 @@ function renderSourceStatusView() {
   if (!grid) return;
   const files = getGlobalLibraryFiles();
   const staleCount = objects.filter(object => ["stale", "needs_refresh"].includes(object.stale)).length;
-  const apiConnected = bootstrapMeta.loadedFrom === "/api/bootstrap";
+  const apiConnected = Boolean(bootstrapMeta.apiConnected);
+  const operations = Array.isArray(operationCatalogData.operations) ? operationCatalogData.operations : [];
+  const confirmationCount = operations.filter(operation => operation.requiresConfirmation).length;
+  const calendarYearCount = Object.keys(marketCalendarData?.years || {}).length;
   const providerRows = Object.entries(providerStatusData.providers || {}).map(([name, provider]) => {
     const health = provider.health || {};
     const capabilities = provider.capabilities || {};
@@ -3944,6 +4363,9 @@ function renderSourceStatusView() {
     return [`Mira Provider · ${name}`, detail, tone, status];
   });
   const rows = [
+    ["数据契约", apiConnected ? "read API contract v1" : "离线静态数据", apiConnected ? "green" : "amber", apiConnected ? "已校验" : "离线"],
+    ["受控操作", operations.length ? `${operations.length} 项；${confirmationCount} 项需要确认` : operationCatalogData.message || "操作目录不可用", operations.length ? "amber" : "red", operations.length ? "受控" : "未接入"],
+    ["A股交易日历", calendarYearCount ? `${calendarYearCount} 个年份 · ${marketCalendarData?.source?.notice || "本地日历"}` : "交易日历未知", calendarYearCount ? "green" : "amber", calendarYearCount ? "已接入" : "未知"],
     ["前端数据源", bootstrapMeta.loadedFrom || "embedded-fallback", apiConnected ? "green" : "red", apiConnected ? "已接入" : "未接入"],
     ["Mira 根目录", bootstrapMeta.miraRoot || "未连接", bootstrapMeta.miraRoot ? "green" : "red", bootstrapMeta.miraRoot ? "已接入" : "未接入"],
     ["研究对象", `${objects.length} 个`, objects.length ? "green" : "red", objects.length ? "已接入" : "未接入"],
@@ -4116,7 +4538,7 @@ function renderSettingsView() {
 
 async function loadAiConfigStatus() {
   try {
-    const payload = await fetchJson("/api/ai-config");
+    const payload = await fetchReadJson("/api/read/ai-config", "ai-config");
     applyAiConfigToSettings(payload.config || {});
   } catch (error) {
     updateAiConnectionStatus({ status: "error", message: "配置接口未接入" });
@@ -4158,7 +4580,7 @@ function collectAiSettings() {
 }
 
 async function saveAiSettings() {
-  const payload = await fetchJson("/api/ai-config", {
+  const payload = await fetchOperationJson("/api/ops/ai-config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(collectAiSettings()),
@@ -4190,7 +4612,7 @@ function attachAiSettingsActions() {
     updateAiConnectionStatus({ status: "saved", message: "正在测试模型接口..." });
     try {
       await saveAiSettings();
-      const payload = await fetchJson("/api/ai-test", { method: "POST", timeoutMs: 30000 });
+      const payload = await fetchOperationJson("/api/ops/ai-test", { method: "POST", timeoutMs: 30000 });
       applyAiConfigToSettings(payload.config || { status: "error", message: payload.message });
     } catch (error) {
       updateAiConnectionStatus({ status: "error", message: error.message });
@@ -4208,6 +4630,117 @@ function initSearch() {
   });
 }
 
+function formatMarketPulseValue(item) {
+  if (!item || item.status !== "ok" || !Number.isFinite(Number(item.value))) return "未获取";
+  const digits = item.kind === "yield" ? 3 : item.id === "usd_hkd" ? 4 : item.kind === "index" ? 2 : 4;
+  return `${Number(item.value).toFixed(digits)}${item.unit || ""}`;
+}
+
+function formatMarketPulseChange(item) {
+  if (!item || item.status !== "ok" || !Number.isFinite(Number(item.change))) return "变动未提供";
+  if (item.kind === "yield") {
+    const basisPoints = Number(item.change) * 100;
+    return `${basisPoints >= 0 ? "+" : ""}${basisPoints.toFixed(1)}bp`;
+  }
+  const digits = item.kind === "index" ? 2 : 4;
+  return `${Number(item.change) >= 0 ? "+" : ""}${Number(item.change).toFixed(digits)}`;
+}
+
+function renderMarketPulse() {
+  const grid = document.getElementById("marketPulseGrid");
+  const status = document.getElementById("marketPulseStatus");
+  const message = document.getElementById("marketPulseMessage");
+  if (!grid || !status || !message) return;
+  const items = Array.isArray(marketPulseData?.items) ? marketPulseData.items : [];
+  const statusMap = {
+    ok: ["已读取", "green"],
+    source_gap: ["部分不可用", "amber"],
+    unavailable: ["未获取", "red"],
+  };
+  const [label, tone] = statusMap[marketPulseData?.status] || ["正在读取", "muted"];
+  status.textContent = label;
+  status.className = `pill ${tone}`;
+  grid.innerHTML = items.length ? items.map(item => {
+    const sourceUrl = safeExternalUrl(item.url);
+    const isPositive = Number(item.change) >= 0;
+    return `
+      <article class="market-pulse-item ${item.status === "ok" ? "" : "is-unavailable"}" data-search-text="${escapeHtml(`${item.label} ${item.provider || ""}`).toLowerCase()}">
+        <div class="market-pulse-item-head"><span>${escapeHtml(item.label || "未命名数据")}</span><em>${escapeHtml(item.sourceDate || "日期未提供")}</em></div>
+        <strong>${escapeHtml(formatMarketPulseValue(item))}</strong>
+        <div class="market-pulse-item-footer">
+          <span class="${item.status === "ok" ? (isPositive ? "positive" : "negative") : "muted-change"}">${escapeHtml(formatMarketPulseChange(item))}</span>
+          ${sourceUrl ? `<a href="${sourceUrl}" target="_blank" rel="noopener noreferrer">来源</a>` : `<span>${escapeHtml(item.message || "数据不可用")}</span>`}
+        </div>
+      </article>`;
+  }).join("") : `<div class="empty-card-state">金融市场数据尚未读取；不会以静态样例替代实时或延迟行情。</div>`;
+  message.textContent = marketPulseData?.message || "";
+}
+
+function renderResearchFeed() {
+  const list = document.getElementById("researchFeedList");
+  const status = document.getElementById("researchFeedStatus");
+  const filters = document.getElementById("feedScopeFilters");
+  if (!list || !status || !filters) return;
+  filters.querySelectorAll("[data-feed-scope]").forEach(button => {
+    button.classList.toggle("selected", button.dataset.feedScope === activeFeedScope);
+  });
+  const data = researchFeedData[activeFeedScope] || { status: "idle", items: [] };
+  const scopeLabel = activeFeedScope === "held" ? "持仓行业" : "自选标的行业";
+  if (data.status === "loading") {
+    status.textContent = `正在读取${scopeLabel}相关新闻；来源返回前不展示历史样例。`;
+    list.innerHTML = `<div class="empty-card-state">正在读取行业新闻…</div>`;
+    return;
+  }
+  if (!Array.isArray(data.items) || !data.items.length) {
+    status.textContent = data.message || `当前未发现可用${scopeLabel}新闻线索。`;
+    list.innerHTML = `<div class="empty-card-state">当前未发现可用行业新闻线索。可在稍后重新进入本页读取。</div>`;
+    return;
+  }
+  status.textContent = `${scopeLabel} · ${data.items.length} 个事件线索 · ${data.message || "均需原文核验"}`;
+  list.innerHTML = data.items.map(item => {
+    const related = Array.isArray(item.relatedObjects) ? item.relatedObjects : [];
+    const source = (item.sources || [])[0] || {};
+    const sourceUrl = safeExternalUrl(source.url);
+    const searchText = `${item.title || ""} ${item.summary || ""} ${related.map(object => `${object.ticker || ""} ${object.name || ""}`).join(" ")}`.toLowerCase();
+    return `
+      <article class="research-feed-item" data-search-text="${escapeHtml(searchText)}">
+        <div class="research-feed-meta">
+          <span class="pill amber">待核验</span>
+          <span>${escapeHtml(item.publishedAt || "发布时间未提供")}</span>
+          <span>${Number(item.sourceCount || 0)} 个来源</span>
+        </div>
+        <h3>${escapeHtml(item.title || "未命名行业新闻")}</h3>
+        <p>${escapeHtml(item.summary || "该条目未提供摘要，请查看原文。")}</p>
+        <div class="research-feed-footer">
+          <div class="feed-related-objects">
+            <span>关联：</span>
+            ${related.map(object => `<button class="feed-object-link" data-feed-open="${escapeHtml(object.ticker || "")}">${escapeHtml(object.name || object.ticker || "未命名对象")}</button>`).join("") || "<span>对象待确认</span>"}
+          </div>
+          ${sourceUrl ? `<a class="feed-source-link" href="${sourceUrl}" target="_blank" rel="noopener noreferrer">查看原文</a>` : ""}
+        </div>
+      </article>`;
+  }).join("");
+}
+
+function attachResearchFeedActions() {
+  const filters = document.getElementById("feedScopeFilters");
+  const list = document.getElementById("researchFeedList");
+  filters?.addEventListener("click", event => {
+    const button = event.target.closest("[data-feed-scope]");
+    if (!button || button.dataset.feedScope === activeFeedScope) return;
+    activeFeedScope = button.dataset.feedScope;
+    renderResearchFeed();
+    if (researchFeedData[activeFeedScope]?.status === "idle") loadResearchFeed(activeFeedScope);
+  });
+  list?.addEventListener("click", event => {
+    const button = event.target.closest("[data-feed-open]");
+    if (!button) return;
+    const ticker = String(button.dataset.feedOpen || "").toUpperCase();
+    const index = objects.findIndex(object => String(object.ticker || "").toUpperCase() === ticker);
+    if (index >= 0) openDetail(index);
+  });
+}
+
 function getCurrentSearchQuery() {
   return document.getElementById("searchInput")?.value.trim().toLowerCase() || "";
 }
@@ -4218,10 +4751,7 @@ function applySearch(q) {
   });
 }
 
-async function initApp() {
-  await Promise.all([loadBootstrap(), loadPortfolioPerformance(), loadProviderStatus(), loadMarketSession(), loadPositionReviews()]);
-  await loadOverviewQuoteArchive();
-  await loadOverviewPriceHistory();
+function renderAppShell() {
   renderNav();
   renderSourceStatus();
   renderMetrics();
@@ -4229,6 +4759,8 @@ async function initApp() {
   renderCards("A股");
   renderRadar();
   renderRadarFocus();
+  renderMarketPulse();
+  renderResearchFeed();
   renderTargetFilters();
   renderTargets("A股");
   renderDetailShell();
@@ -4249,7 +4781,46 @@ async function initApp() {
   attachQueueActions();
   attachIndustryActions();
   attachPortfolioActions();
+  attachResearchFeedActions();
   initSearch();
+}
+
+async function loadBackgroundContext({ loadPortfolio = false } = {}) {
+  const tasks = [
+    loadProviderStatus(),
+    loadMarketPulse(),
+    loadMarketCalendar(),
+    loadMarketSession(),
+    loadPositionReviews(),
+    loadOperationCatalog(),
+  ];
+  if (loadPortfolio) tasks.push(loadPortfolioPerformance());
+  await Promise.all(tasks);
+  renderSourceStatus();
+  renderMarketPulse();
+  renderResearchFeed();
+  renderPortfolio();
+  if (document.getElementById("sourcesView")?.classList.contains("active")) renderSourceStatusView();
+  if (document.getElementById("settingsView")?.classList.contains("active")) renderSettingsView();
+}
+
+async function initApp() {
+  const cachedSnapshot = restoreAppSnapshot();
+  if (cachedSnapshot) {
+    renderAppShell();
+    const statusNode = document.getElementById("overviewQuoteStatus");
+    if (statusNode) statusNode.textContent = cachedSnapshotLabel(cachedSnapshot);
+    void loadBackgroundContext({ loadPortfolio: false });
+    return;
+  }
+
+  await loadBootstrap();
+  await Promise.all([loadOverviewQuoteArchive(), loadOverviewPriceHistory()]);
+  renderAppShell();
+  persistAppSnapshot("initial_local_load");
+  void loadBackgroundContext({ loadPortfolio: true }).then(() => {
+    persistAppSnapshot("initial_local_load");
+  });
 }
 
 initApp();

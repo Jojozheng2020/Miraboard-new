@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>MiraBoard 投资分析看板</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=20260711-info-feed-v1" />
 </head>
 <body>
   <div class="app-shell">
@@ -41,7 +41,7 @@
             <span class="action-icon-small line-chart"></span>
             刷新全部股价
           </button>
-          <button class="ghost-btn" id="globalRefreshBtn">刷新队列</button>
+          <button class="ghost-btn" id="globalRefreshBtn">刷新数据源</button>
         </div>
       </header>
 
@@ -98,6 +98,37 @@
                 <tbody id="researchCards"></tbody>
               </table>
             </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="feedView" aria-labelledby="sectionTitle">
+        <div class="feed-page">
+          <section class="panel market-pulse-panel">
+            <div class="panel-header">
+              <div>
+                <h2>金融市场脉搏</h2>
+                <p>国债收益率、汇率和美元指数；数据源与可用状态单独标示。</p>
+              </div>
+              <span class="pill muted" id="marketPulseStatus">正在读取</span>
+            </div>
+            <div class="market-pulse-grid" id="marketPulseGrid" aria-live="polite"></div>
+            <p class="market-pulse-note" id="marketPulseMessage"></p>
+          </section>
+
+          <section class="panel research-feed-panel">
+            <div class="panel-header feed-panel-header">
+              <div>
+                <h2>精选行业动态</h2>
+                <p>持仓行业优先；新闻只作事件发现，原文核验后才能进入研究证据链。</p>
+              </div>
+              <div class="segmented feed-scope-filters" id="feedScopeFilters" role="tablist" aria-label="信息流范围">
+                <button class="selected" data-feed-scope="held">持仓行业</button>
+                <button data-feed-scope="watchlist">自选标的行业</button>
+              </div>
+            </div>
+            <p class="feed-status" id="researchFeedStatus" aria-live="polite">进入页面后读取关联行业新闻。</p>
+            <div class="research-feed-list" id="researchFeedList"></div>
           </section>
         </div>
       </section>
@@ -523,9 +554,11 @@
   </div>
 
   <script src="./frontend_security.js?v=20260703-2"></script>
+  <script src="./frontend_contracts.js?v=20260711-contract-parity-v2"></script>
+  <script src="./frontend_cache.js?v=20260711-dashboard-cache-v1"></script>
   <script src="./data_utils.js?v=20260703-2"></script>
   <script src="./markdown_renderer.js?v=20260703-2"></script>
   <script src="./option_math.js?v=20260703"></script>
-  <script src="./app.js?v=20260703-activity-scope-v2"></script>
+  <script src="./app.js?v=20260711-dashboard-cache-v1"></script>
 </body>
 </html>

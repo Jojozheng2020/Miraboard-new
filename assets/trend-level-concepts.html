@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MiraBoard 走势点位组件方案</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --line: #e3e9f2;
+      --text: #172033;
+      --muted: #667085;
+      --blue: #2f7cf6;
+      --green: #24936e;
+      --amber: #c47b16;
+      --red: #c84444;
+      --soft-green: #edf8f2;
+      --soft-red: #fff2f2;
+      --font: "Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", Arial, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      letter-spacing: 0;
+    }
+
+    .page { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    .top { display: flex; justify-content: space-between; gap: 24px; align-items: end; margin-bottom: 18px; }
+    .top h1 { margin: 0; font-size: 24px; line-height: 1.25; }
+    .top p { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+    .note {
+      flex: 0 0 auto;
+      border: 1px solid var(--line);
+      background: #fff;
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: #526071;
+      font-size: 12px;
+    }
+
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+    .concept { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); overflow: hidden; }
+    .concept.wide { grid-column: 1 / -1; }
+    .concept-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 14px;
+      align-items: center;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfe;
+    }
+    .concept-head strong { display: block; font-size: 15px; }
+    .concept-head span { display: block; margin-top: 3px; color: var(--muted); font-size: 12px; }
+    .tag {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      padding: 5px 8px;
+      background: #eef1f5;
+      color: #465267;
+      font-size: 11px;
+      font-weight: 750;
+      white-space: nowrap;
+    }
+    .preview { padding: 18px; display: grid; gap: 14px; }
+
+    .table-sample { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .table-sample th,
+    .table-sample td {
+      border-bottom: 1px solid var(--line);
+      height: 58px;
+      padding: 9px 14px;
+      text-align: left;
+      vertical-align: middle;
+      font-size: 13px;
+    }
+    .table-sample th { height: 42px; background: #fff; color: #344054; font-size: 12px; font-weight: 750; }
+    .table-sample tr:nth-child(odd) td { background: #f8fafc; }
+    .table-sample .company { width: 22%; }
+    .table-sample .trend { width: 34%; }
+    .muted { color: var(--muted); }
+    .plain-trend {
+      display: block;
+      overflow: hidden;
+      color: #465267;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .plain-trend.critical { color: var(--red); font-weight: 800; }
+
+    .range-widget { display: grid; gap: 7px; min-width: 0; }
+    .range-top { display: flex; justify-content: space-between; gap: 10px; align-items: center; min-width: 0; }
+    .range-top strong {
+      overflow: hidden;
+      color: #344054;
+      font-size: 13px;
+      font-weight: 750;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .range-top em {
+      flex: 0 0 auto;
+      color: var(--muted);
+      font-size: 11px;
+      font-style: normal;
+      font-variant-numeric: tabular-nums;
+    }
+    .segments {
+      position: relative;
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 3px;
+      height: 16px;
+    }
+    .segments i { border: 1px solid #cfd8e6; background: #fff; }
+    .segments i:first-child { border-radius: 4px 0 0 4px; }
+    .segments i:last-child { border-radius: 0 4px 4px 0; }
+    .segments .danger { background: #ffdcdc; border-color: #e3a3a3; }
+    .segments .active { background: #9fca61; border-color: #7da342; }
+    .segments .good { background: #ccebdc; border-color: #8ac4a7; }
+    .pointer {
+      position: absolute;
+      top: -12px;
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 9px solid var(--blue);
+      filter: drop-shadow(0 -1px 0 rgba(47, 124, 246, 0.2));
+    }
+    .pointer.p2 { left: calc(30% - 6px); }
+    .pointer.p3 { left: calc(50% - 6px); }
+    .ticks {
+      display: flex;
+      justify-content: space-between;
+      color: #7b8798;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .capsule {
+      display: inline-grid;
+      grid-template-columns: auto minmax(96px, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+      max-width: 100%;
+      border: 1px solid var(--line);
+      border-left: 3px solid var(--green);
+      border-radius: 7px;
+      background: #fff;
+      padding: 7px 9px;
+    }
+    .capsule.risk { border-left-color: var(--red); }
+    .capsule b { color: #344054; font-size: 12px; white-space: nowrap; }
+    .capsule small { overflow: hidden; color: var(--muted); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+    .capsule em {
+      color: #526071;
+      font-size: 11px;
+      font-style: normal;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+    .rail {
+      position: relative;
+      height: 6px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #ffdcdc 0 24%, #ffe8c7 24% 44%, #dff3e9 44% 72%, #eef4ff 72% 100%);
+    }
+    .rail::after {
+      content: "";
+      position: absolute;
+      left: var(--pos);
+      top: 50%;
+      width: 12px;
+      height: 12px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      background: var(--dot);
+      box-shadow: 0 0 0 1px rgba(23, 32, 51, 0.16);
+      transform: translate(-50%, -50%);
+    }
+
+    .ladder { display: grid; gap: 8px; }
+    .ladder-row {
+      display: grid;
+      grid-template-columns: 86px minmax(0, 1fr) 82px;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: #fbfcfe;
+    }
+    .ladder-row.current { border-color: #b8d6c7; background: var(--soft-green); }
+    .ladder-row.invalid { border-color: #efb8b8; background: var(--soft-red); }
+    .ladder-row b { color: #344054; font-size: 12px; }
+    .ladder-row span { overflow: hidden; color: #526071; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .ladder-row em {
+      color: #344054;
+      font-size: 12px;
+      font-style: normal;
+      font-weight: 750;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .map {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 148px;
+      gap: 12px;
+      align-items: center;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+    }
+    .map-title { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+    .map-title strong { overflow: hidden; color: #344054; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+    .map-title em { color: var(--muted); font-size: 12px; font-style: normal; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .mini-levels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+    .mini-levels span {
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--line);
+      color: #526071;
+      font-size: 10px;
+      font-weight: 750;
+    }
+    .mini-levels .now { background: #9fca61; color: #17340d; border-color: #7da342; }
+    .mini-levels .bad { background: #ffe1e1; color: #a42e2e; }
+    .mini-levels .confirm { background: #eef4ff; color: #245edb; }
+    .decision { border-left: 3px solid var(--green); padding-left: 10px; }
+    .decision.risk { border-left-color: var(--red); }
+    .decision strong,
+    .decision span { display: block; }
+    .decision strong { color: #344054; font-size: 13px; }
+    .decision span { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 0;
+      border: 1px solid #1f2937;
+      background: #1f2937;
+    }
+    .matrix span {
+      min-height: 46px;
+      display: grid;
+      place-items: center;
+      background: #fff;
+      color: #344054;
+      font-size: 12px;
+      font-weight: 750;
+    }
+    .matrix .current { position: relative; background: #9fca61; color: #17340d; }
+    .matrix .current::before {
+      content: "";
+      position: absolute;
+      top: -22px;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-left: 8px solid transparent;
+      border-right: 8px solid transparent;
+      border-top: 15px solid #6887ff;
+      transform: translateX(-50%);
+    }
+    .matrix-wrap { padding-top: 24px; }
+
+    @media (max-width: 860px) {
+      .page { padding: 18px; }
+      .top { display: grid; }
+      .note { width: 100%; }
+      .grid { grid-template-columns: 1fr; }
+      .concept.wide { grid-column: auto; }
+      .map { grid-template-columns: 1fr; }
+      .table-sample { min-width: 760px; }
+      .table-scroll { overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="top">
+      <div>
+        <h1>Mira 走势点位组件候选</h1>
+        <p>用于替换或扩展“走势判断”列：既保留一句话判断，也把当前价格所处区间、确认位、失效位用小图形表达出来。</p>
+      </div>
+      <div class="note">红色只用于关键失效 / 跌破 / 防守确认提醒。</div>
+    </section>
+
+    <section class="grid">
+      <article class="concept wide">
+        <header class="concept-head">
+          <div>
+            <strong>方案 1：表格内分段点位条</strong>
+            <span>最接近附件的小格子，适合直接放进“走势判断”列。</span>
+          </div>
+          <span class="tag">推荐先试</span>
+        </header>
+        <div class="preview table-scroll">
+          <table class="table-sample">
+            <thead>
+              <tr>
+                <th class="company">公司 / 研究对象</th>
+                <th>最新价</th>
+                <th class="trend">Mira 走势判断</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>电投能源</strong><br><span class="muted">002128.SZ</span></td>
+                <td>23.98</td>
+                <td>
+                  <div class="range-widget">
+                    <div class="range-top"><strong>弱势下行 / 防守确认</strong><em>23.20-24.60</em></div>
+                    <div class="segments"><i class="danger"></i><i class="active"></i><i></i><i></i><i></i><b class="pointer p2"></b></div>
+                    <div class="ticks"><span>失效 22.80</span><span>防守 23.20</span><span>确认 24.60</span></div>
+                  </div>
+                </td>
+                <td>观察</td>
+              </tr>
+              <tr>
+                <td><strong>云铝股份</strong><br><span class="muted">000807.SZ</span></td>
+                <td>16.42</td>
+                <td>
+                  <div class="range-widget">
+                    <div class="range-top"><strong>上行延续 / 确认后继续抬升</strong><em>15.90-17.10</em></div>
+                    <div class="segments"><i></i><i></i><i class="active"></i><i class="good"></i><i></i><b class="pointer p3"></b></div>
+                    <div class="ticks"><span>回踩 15.90</span><span>当前区</span><span>突破 17.10</span></div>
+                  </div>
+                </td>
+                <td>跟踪</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="concept">
+        <header class="concept-head">
+          <div>
+            <strong>方案 2：紧凑胶囊 + 细轨道</strong>
+            <span>更省宽度，适合表格列不想加宽的情况。</span>
+          </div>
+          <span class="tag">最稳妥</span>
+        </header>
+        <div class="preview">
+          <div class="capsule risk">
+            <b>防守确认</b>
+            <div class="rail" style="--pos: 32%; --dot: var(--red);"></div>
+            <em>22.80 / 23.20</em>
+          </div>
+          <div class="capsule">
+            <b>趋势确认区</b>
+            <div class="rail" style="--pos: 58%; --dot: var(--green);"></div>
+            <em>15.90 / 17.10</em>
+          </div>
+          <div class="capsule">
+            <b>反弹观察</b>
+            <small>站稳 41.80 才升级，不站稳只算修复</small>
+            <em>41.80</em>
+          </div>
+        </div>
+      </article>
+
+      <article class="concept">
+        <header class="concept-head">
+          <div>
+            <strong>方案 3：点位阶梯</strong>
+            <span>信息解释最清楚，适合详情页或展开行。</span>
+          </div>
+          <span class="tag">解释力强</span>
+        </header>
+        <div class="preview">
+          <div class="ladder">
+            <div class="ladder-row"><b>突破确认</b><span>放量站稳后，趋势升级</span><em>24.60</em></div>
+            <div class="ladder-row current"><b>当前区间</b><span>防守确认，等待收盘验证</span><em>23.98</em></div>
+            <div class="ladder-row invalid"><b>失效位</b><span>跌破后无法收回，判断降级</span><em>22.80</em></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="concept">
+        <header class="concept-head">
+          <div>
+            <strong>方案 4：判断 + 小地图</strong>
+            <span>把文字判断和区间位置分开，适合详情页顶部摘要。</span>
+          </div>
+          <span class="tag">详情页</span>
+        </header>
+        <div class="preview">
+          <div class="map">
+            <div>
+              <div class="map-title"><strong>弱势下行 / 防守确认</strong><em>当前 23.98</em></div>
+              <div class="mini-levels"><span class="bad">失效</span><span class="now">防守</span><span>观察</span><span class="confirm">确认</span></div>
+            </div>
+            <div class="decision risk">
+              <strong>优先看收盘</strong>
+              <span>守不住 23.20，则按失效位 22.80 复核。</span>
+            </div>
+          </div>
+          <div class="map">
+            <div>
+              <div class="map-title"><strong>上行延续 / 确认后抬升</strong><em>当前 16.42</em></div>
+              <div class="mini-levels"><span>回踩</span><span class="now">当前</span><span class="confirm">突破</span><span>扩展</span></div>
+            </div>
+            <div class="decision">
+              <strong>等待确认</strong>
+              <span>未突破前保持观察，不用红色提醒。</span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="concept">
+        <header class="concept-head">
+          <div>
+            <strong>方案 5：原型黑框小格</strong>
+            <span>最像附件 2，适合做视觉符号，但信息量最少。</span>
+          </div>
+          <span class="tag">最图标化</span>
+        </header>
+        <div class="preview">
+          <div class="matrix-wrap">
+            <div class="matrix">
+              <span>失效</span>
+              <span class="current">防守</span>
+              <span>观察</span>
+              <span>确认</span>
+            </div>
+          </div>
+          <span class="plain-trend critical">弱势下行 / 防守确认</span>
+          <span class="plain-trend">上行延续 / 确认后继续抬升</span>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>
